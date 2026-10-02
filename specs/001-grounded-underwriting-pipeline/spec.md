@@ -104,7 +104,7 @@ An analyst watches the decision being made: which analyses ran, in what order, w
 **Analyses**
 
 - **FR-004**: System MUST compute revenue metrics from transaction records, returning at minimum: a monthly revenue series, average monthly revenue, month-over-month growth rate, trend direction, and the number of months covered.
-- **FR-005**: System MUST compute revenue stability from the monthly revenue series, returning at minimum: a coefficient of variation and a stability score.
+- **FR-005**: System MUST compute revenue stability from the monthly revenue series, returning at minimum: a coefficient of variation and a stability score. The coefficient of variation MUST be measured **after the trend is removed** — the expected series implied by the measured growth rate is subtracted and the variation of the residuals is reported. *(Measured on the raw series it would conflate trend with unpredictability: a perfectly smooth 2%-per-month growth line has a raw coefficient of variation of 0.106, and a smooth 12%-per-month decline reaches 0.52. A merchant with no month-to-month uncertainty whatsoever would score as volatile, and a declining merchant would be penalised once by the trend measure and again by the volatility measure. Detrending keeps the two measures independent, which is what their separate risk weights claim.)*
 - **FR-006**: System MUST detect cashflow risk indicators from transaction records, returning at minimum: an overdraft count, a bounced-payment count, whether the balance trend is declining, and a count of large one-off movements together with the identified items.
 - **FR-007**: System MUST assign a risk tier from the computed metrics using documented rules, and the same inputs MUST always produce the same tier.
 - **FR-008**: System MUST compute offer terms — advance amount, repayment percentage, and expected duration — from the metrics and risk tier, with every term falling within the declared policy bounds.
@@ -199,6 +199,7 @@ SC-001 is stated first deliberately. SC-002 through SC-004 verify that the plumb
 - Retrieval of underwriting policy text to support justifications is an explicit non-goal of this specification.
 - One analyst at a time; no concurrent use, no multi-user state, no authentication.
 - The decision is advisory. No funds move, and no downstream lending system is integrated.
+- Revenue means **net cash received into the bank account**. The sales export lists individual sales; those are batched into bank deposits with a payment-processor fee deducted, so gross sales exceed banked revenue slightly. Net is the right basis because repayment is taken from cash that actually arrives.
 - Large one-off inflows are detected and reported but are **not** excluded from the revenue basis, so a
   merchant with an exceptional inflow may be sized against revenue that is not fully recurring. A
   deliberate simplification: excluding them would introduce a second revenue figure, and both the memo

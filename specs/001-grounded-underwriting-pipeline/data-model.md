@@ -42,7 +42,7 @@ numeral-match candidates.
 | `monthly_revenue` | `list[tuple[str, float]]` | each element | `("2026-01", 47812.34)`, ascending by month |
 | `avg_monthly_revenue` | `float` | yes | |
 | `total_revenue` | `float` | yes | |
-| `mom_growth_pct` | `float` | yes | Mean month-over-month change, percent |
+| `mom_growth_pct` | `float` | yes | Mean month-over-month change, percent. Also defines the trend line that `compute_volatility` subtracts |
 | `months_covered` | `int` | yes | Whole months spanned. Exists to satisfy FR-009/FR-019. |
 | `period_start` | `str` | no | ISO date |
 | `period_end` | `str` | no | ISO date |
@@ -52,8 +52,8 @@ numeral-match candidates.
 
 | Field | Type | Groundable | Notes |
 |---|---|---|---|
-| `revenue_cv` | `float` | yes | Coefficient of variation: stdev ÷ mean |
-| `revenue_stdev` | `float` | yes | |
+| `revenue_cv` | `float` | yes | **Detrended**: `revenue_stdev ÷ mean(monthly_revenue)`. See FR-005 |
+| `revenue_stdev` | `float` | yes | Standard deviation of the **residuals** after subtracting the trend line |
 | `stability_score` | `int` | yes | 0–100, derived from `revenue_cv` via `policy.py` bands |
 | `insufficient_history` | `bool` | no | `True` when months < the policy minimum (thin-file edge case) |
 
