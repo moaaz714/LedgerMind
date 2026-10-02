@@ -129,7 +129,7 @@ An analyst watches the decision being made: which analyses ran, in what order, w
 - **FR-018**: A numeral resolves if it equals a recorded value rounded to any precision on this declared ladder: nearest 1, nearest 10, nearest 100, nearest 1000, or one decimal place. No tolerance beyond this ladder is permitted. *(Worked example: a recorded average monthly revenue of 47812.34 is matched by "47,812", "47,800", and "48,000"; it is not matched by "52,000" or "50,000".)*
 - **FR-019**: All numerals are in scope, including counts and durations, not only currency amounts and percentages. Cardinal numbers written as words MUST also be resolved.
 - **FR-020**: A narrative containing any numeral that does not resolve MUST be rejected and MUST NOT be displayed.
-- **FR-021**: A narrative that cites none of the decision's figures MUST be rejected as incomplete; a displayed memo MUST reference at least the advance amount, the repayment percentage, and one revenue metric.
+- **FR-021**: A narrative that cites none of the decision's figures MUST be rejected as incomplete. For an **approved** merchant, a displayed memo MUST reference at least the advance amount, the repayment percentage, and one revenue metric. For a **declined** merchant — which has neither an advance nor a repayment percentage — it MUST reference the decline reason and at least one metric that drove the decision. *(The original wording required the advance and repayment percentage unconditionally, which made every decline memo permanently unsatisfiable: the check would reject each attempt until the retry allowance ran out and the fallback fired. Surfaced while designing the risk policy.)*
 - **FR-022**: Before any offer is displayed, System MUST verify its terms against the declared policy bounds. A breach MUST be surfaced as a defect in the offer logic, not treated as narrative to regenerate.
 
 **Failure handling**
@@ -153,6 +153,10 @@ An analyst watches the decision being made: which analyses ran, in what order, w
 
 - **FR-031**: Generated merchant data MUST persist on disk at a stable location and MUST be generated only when absent. A run MUST NOT regenerate or overwrite merchant data that already exists. A merchant whose stored data is incomplete — missing any of its records or its recorded correct answers — MUST be treated as absent and regenerated in full. *(This is not only convenience: SC-004 measures whether three runs of the same merchant agree, which is meaningless if the merchant's history changes between runs. Stable inputs are a precondition for the measurement.)*
 - **FR-032**: Overwriting existing merchant data MUST require an explicit, deliberate action, and MUST state which merchants will be overwritten before doing so.
+
+**Declined merchants**
+
+- **FR-033**: A declined merchant MUST receive a written memo explaining the refusal, held to the same grounding standard as an approved one. A decision to refuse credit has to be defensible to a credit committee in the same way a decision to extend it does.
 
 ### Key Entities
 
@@ -195,3 +199,7 @@ SC-001 is stated first deliberately. SC-002 through SC-004 verify that the plumb
 - Retrieval of underwriting policy text to support justifications is an explicit non-goal of this specification.
 - One analyst at a time; no concurrent use, no multi-user state, no authentication.
 - The decision is advisory. No funds move, and no downstream lending system is integrated.
+- Large one-off inflows are detected and reported but are **not** excluded from the revenue basis, so a
+  merchant with an exceptional inflow may be sized against revenue that is not fully recurring. A
+  deliberate simplification: excluding them would introduce a second revenue figure, and both the memo
+  and the grounding check would then have to disambiguate which of the two any given claim refers to.
