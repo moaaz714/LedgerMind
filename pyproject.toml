@@ -1,0 +1,15 @@
+# Project configuration.
+#
+# Deliberately no [project] table and no build backend. LedgerMind is run from the
+# repository root and never installed as a distribution, so packaging metadata would
+# be dead weight that has to be kept correct for no benefit.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+# Without this, `import ledgermind` fails inside tests. pytest puts the test file's
+# own directory on sys.path, not the repository root, so tests/ can see itself but
+# not the package it is testing. The usual alternative is to make the project
+# installable and `pip install -e .`; pythonpath achieves the same reachability
+# without introducing packaging we would otherwise never use.
+pythonpath = ["."]
