@@ -1,0 +1,30 @@
+# LedgerMind dependencies.
+#
+# Pinned to the exact set verified working on Python 3.14.2 on 2026-10-02: all
+# installed from wheels with no source builds, the pandas -> pyarrow round-trip
+# succeeds, and `streamlit run` boots and serves headlessly. Python 3.14 is new
+# enough that "it resolves" was not sufficient evidence, so the set below is what
+# was actually run rather than what a support matrix claims.
+# See specs/001-grounded-underwriting-pipeline/plan.md, Technical Context.
+#
+# Deliberately absent: an HTTP client. The Ollama provider uses urllib.request
+# from the standard library, so the agent's only network dependency is the local
+# Ollama service itself.
+#
+# Also absent: anything the deterministic tools need. They are stdlib only --
+# csv, datetime, statistics -- which is what keeps Article IV's purity rule
+# trivial to honour and lets tool tests use hand-computed fixtures.
+
+# --- Presentation layer: imported only by ledgermind/app/ ---
+streamlit==1.64.0
+pandas==3.0.6
+
+# Transitive dependencies of streamlit, pinned because they are the versions the
+# verification above actually exercised. Left unpinned they could drift to a
+# resolution nobody has run on 3.14.
+numpy==2.5.3
+pyarrow==25.0.1
+altair==6.3.0
+
+# --- Tests ---
+pytest==9.1.1

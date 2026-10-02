@@ -52,7 +52,7 @@ Reconcile with `/speckit-converge` at the end of Day 1.
 **Purpose**: Project skeleton that imports cleanly and runs an empty test suite.
 
 - [x] T001 Create the package skeleton with `__init__.py` in `ledgermind/`, `ledgermind/data/`, `ledgermind/tools/`, `ledgermind/llm/`, `ledgermind/agent/`, `ledgermind/guardrail/`, `ledgermind/eval/`, `ledgermind/app/`, and an empty `tests/` directory, matching plan.md exactly
-- [ ] T002 Create `requirements.txt` pinning the versions verified on Python 3.14.2 — `streamlit==1.64.0`, `pandas==3.0.6`, `numpy==2.5.3`, `pyarrow==25.0.1`, `altair==6.3.0`, plus `pytest` — and install it into `.venv`. Ollama is a local service, not a pip dependency
+- [x] T002 Create `requirements.txt` pinning the versions verified on Python 3.14.2 — `streamlit==1.64.0`, `pandas==3.0.6`, `numpy==2.5.3`, `pyarrow==25.0.1`, `altair==6.3.0`, plus `pytest` — and install it into `.venv`. Ollama is a local service, not a pip dependency
 - [ ] T003 Configure pytest in `pyproject.toml` (`[tool.pytest.ini_options]`, testpaths = `tests`) and add `tests/test_smoke.py` asserting every `ledgermind` subpackage imports
 
 ---
