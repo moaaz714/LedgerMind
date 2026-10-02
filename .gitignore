@@ -1,0 +1,32 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Virtual environment ---
+.venv/
+venv/
+env/
+
+# --- Environment / secrets ---
+.env
+.env.*
+*.key
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+*.swp
+
+# --- Claude Code local context (working doc; kept out of the public repo) ---
+CLAUDE.md
+
+# NOTE: .specify/ (constitution, spec, plan, tasks) is intentionally NOT ignored —
+# those artifacts are committed as part of the spec-driven-development story.
