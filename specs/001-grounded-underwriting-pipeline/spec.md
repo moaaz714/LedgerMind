@@ -89,6 +89,7 @@ An analyst watches the decision being made: which analyses ran, in what order, w
 - **Numeral spelled as a word**: cardinal numbers written as words are treated as numerals, so a miscount cannot evade verification by being spelled out.
 - **Ambiguous resolution**: when two different recorded facts hold the same value, a matching numeral is considered resolved — the claim being verified is that the figure came from an analysis, not which one. Provenance display lists every matching fact.
 - **Retries exhausted**: covered by US2; the labelled deterministic fallback is the defined outcome.
+- **Partially generated merchant**: a stored merchant missing any of its three artifacts is incomplete, and is regenerated in full rather than used or silently half-loaded (FR-031).
 
 ## Requirements *(mandatory)*
 
@@ -147,6 +148,11 @@ An analyst watches the decision being made: which analyses ran, in what order, w
 
 - **FR-029**: The interface MUST display the memo, the structured offer, and the provenance of each displayed figure.
 - **FR-030**: The interface MUST NOT compute, derive, or re-round any financial value; it displays what the analyses produced.
+
+**Data persistence**
+
+- **FR-031**: Generated merchant data MUST persist on disk at a stable location and MUST be generated only when absent. A run MUST NOT regenerate or overwrite merchant data that already exists. A merchant whose stored data is incomplete — missing any of its records or its recorded correct answers — MUST be treated as absent and regenerated in full. *(This is not only convenience: SC-004 measures whether three runs of the same merchant agree, which is meaningless if the merchant's history changes between runs. Stable inputs are a precondition for the measurement.)*
+- **FR-032**: Overwriting existing merchant data MUST require an explicit, deliberate action, and MUST state which merchants will be overwritten before doing so.
 
 ### Key Entities
 
