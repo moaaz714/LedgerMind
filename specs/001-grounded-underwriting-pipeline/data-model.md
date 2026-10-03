@@ -64,7 +64,7 @@ numeral-match candidates.
 | `overdraft_count` | `int` | yes | **Episodes** — crossings from non-negative to negative balance, not negative rows (FR-006) |
 | `bounced_payment_count` | `int` | yes | |
 | `large_one_off_count` | `int` | yes | |
-| `flag_count` | `int` | yes | Total across all kinds |
+| `flag_count` | `int` | yes | Overdrafts + bounced payments + one-offs, plus 1 if `declining_balance`. Exists so a memo phrase like "four cashflow flags" has a fact to resolve against |
 | `min_balance` | `float` | yes | Lowest balance observed |
 | `large_one_offs` | `list[dict]` | each `amount` | `{date, amount, description}`. An inflow above `Q3 + 3×IQR` of the merchant's own inflows |
 | `declining_balance` | `bool` | no | |
@@ -76,7 +76,7 @@ An empty result is a count of zero, never an absent fact (spec edge case).
 | Field | Type | Groundable | Notes |
 |---|---|---|---|
 | `risk_score` | `int` | yes | 0–100, computed from `policy.py` weights |
-| `risk_tier` | `str` | no | `"A"` \| `"B"` \| `"C"` \| `"D"` |
+| `risk_tier` | `str \| None` | no | `"A"` \| `"B"` \| `"C"` \| `"D"`, or **None when declined** — a refused merchant has no tier, and inventing one would put a misleading grade in front of an analyst |
 | `declined` | `bool` | no | |
 | `decline_reason` | `str \| None` | no | Set only when `declined` |
 | `drivers` | `list[str]` | no | Non-numeric reasons, for the memo to draw on |
@@ -90,6 +90,8 @@ An empty result is a count of zero, never an absent fact (spec edge case).
 | `expected_duration_months` | `int` | yes | |
 | `total_repayable` | `float` | yes | |
 | `advance_cap_applied` | `bool` | no | `True` when the cap, not the formula, set the amount |
+| `declined` | `bool` | no | |
+| `decline_reason` | `str \| None` | no | Set only when `declined`. On a decline every numeric field above is **zeroed, not omitted**, so the ledger has facts to register and a decline memo has figures to cite (FR-021) |
 | `policy_version` | `str` | no | From `policy.py`, so an offer is traceable to the rules that made it |
 
 ## Fact ledger

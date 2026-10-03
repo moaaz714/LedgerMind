@@ -50,12 +50,18 @@ VOLATILITY_BANDS = (
     (inf, (15, 40)),
 )
 
+# Trend thresholds, named once so the risk bands and the human-readable label cannot
+# disagree about where "flat" ends.
+TREND_STEEP_DECLINE_PCT = -8.0
+TREND_DECLINING_PCT = -2.0
+TREND_RISING_PCT = 2.0
+
 # (month-over-month growth percent upper bound, risk_points)
 TREND_BANDS = (
-    (-8.0, 25),   # steep decline
-    (-2.0, 18),   # declining
-    (2.0, 10),    # flat
-    (inf, 0),     # rising
+    (TREND_STEEP_DECLINE_PCT, 25),
+    (TREND_DECLINING_PCT, 18),
+    (TREND_RISING_PCT, 10),
+    (inf, 0),
 )
 
 # (months of history upper bound, risk_points). Below MIN_MONTHS_HISTORY the merchant is
@@ -242,3 +248,12 @@ def history_risk_points(months_covered: int) -> int:
 def tier_for_score(risk_score: int) -> str | None:
     """Tier for a risk score, or None when the score means declined."""
     return _resolve_band(risk_score, TIER_BANDS)
+
+
+def trend_label(mom_growth_pct: float) -> str:
+    """Human-readable trend direction, sharing the bands' own boundaries."""
+    if mom_growth_pct <= TREND_DECLINING_PCT:
+        return "declining"
+    if mom_growth_pct <= TREND_RISING_PCT:
+        return "flat"
+    return "rising"
