@@ -29,6 +29,12 @@ POLICY_VERSION = "1.0.0"
 # is the only thing that would catch it.
 # --------------------------------------------------------------------------------------
 
+# Both the risk score and the stability score run 0 to this. The tools return it as a
+# named fact so a memo can legitimately write "72 out of 100": a bare denominator with no
+# recorded value behind it would otherwise be rejected as fabricated. Same principle as
+# FR-009 -- a figure the prose will naturally use must exist as a fact.
+SCORE_SCALE_MAX = 100
+
 RISK_WEIGHT_VOLATILITY = 40
 RISK_WEIGHT_TREND = 25
 RISK_WEIGHT_FLAGS = 25

@@ -55,6 +55,7 @@ numeral-match candidates.
 | `revenue_cv` | `float` | yes | **Detrended**: `revenue_stdev ÷ mean(monthly_revenue)`. See FR-005 |
 | `revenue_stdev` | `float` | yes | Standard deviation of the **residuals** after subtracting the trend line |
 | `stability_score` | `int` | yes | 0–100, derived from `revenue_cv` via `policy.py` bands |
+| `stability_score_max` | `int` | yes | The scale (100). Returned so prose may write "95 out of 100" — a bare denominator with no recorded value behind it is rejected as fabricated |
 | `insufficient_history` | `bool` | no | `True` when months < the policy minimum (thin-file edge case) |
 
 ### `detect_cashflow_flags(transactions) -> dict`
@@ -76,6 +77,9 @@ An empty result is a count of zero, never an absent fact (spec edge case).
 | Field | Type | Groundable | Notes |
 |---|---|---|---|
 | `risk_score` | `int` | yes | 0–100, computed from `policy.py` weights |
+| `risk_score_max` | `int` | yes | The scale (100), for the same reason as `stability_score_max` |
+| `decline_threshold` | `int` | yes | The score at which a merchant is refused. Returned whether or not they were |
+| `min_months_history` | `int` | yes | The history floor. `decline_reason` names both of these in prose, so a memo explaining either outcome can cite them |
 | `risk_tier` | `str \| None` | no | `"A"` \| `"B"` \| `"C"` \| `"D"`, or **None when declined** — a refused merchant has no tier, and inventing one would put a misleading grade in front of an analyst |
 | `declined` | `bool` | no | |
 | `decline_reason` | `str \| None` | no | Set only when `declined` |
@@ -117,7 +121,12 @@ An empty result is a count of zero, never an absent fact (spec edge case).
    `amount` as `flags.large_one_offs.0.amount`. Without this, a memo citing a single month's revenue
    would fail grounding despite the figure being entirely legitimate.
 5. **Non-numeric values are still registered**, for provenance display, but are not candidates for
-   numeral resolution.
+   numeral resolution. Booleans are excluded explicitly: `isinstance(True, int)` holds in Python, so
+   without that a memo containing "1" would resolve against every false-valued flag.
+6. **A figure the prose will naturally use must exist as a fact.** Scale denominators and the
+   thresholds a decision was judged against are returned by the tools for this reason (FR-009).
+   Otherwise an honest memo writing "72 out of 100" or "below our 6-month minimum" would be
+   rejected, because 100 and 6 would appear nowhere in the ledger.
 
 ### Resolution
 
@@ -149,6 +158,22 @@ Importable **only** by `tests/` and `eval/` (Article III). Enforced by a test th
 of `tools/`, `agent/`, `guardrail/`, and `app/` and fails if any of them reach truth — a structural
 guarantee rather than a convention, because a convenience import during debugging is exactly how this
 kind of rule dies.
+
+### Numeral extraction
+
+Extraction errs toward catching too much, because the two failure directions are not
+symmetric: a false rejection costs one regeneration, while a numeral the scanner *misses* is
+displayed to the analyst having never been checked. Spelled cardinals therefore run to one
+hundred including compounds ("ninety-two"), not merely to twenty.
+
+Three exemptions, each narrow: ISO date strings are stripped before scanning; bare integers
+in 1900–2100 with no separator, decimal, currency or percent are calendar years rather than
+figures; and hyphens are excluded from the cardinal word boundary so "one-off" is not the
+number one, while genuine compounds are matched as a unit first.
+
+Not treated as numerals: "no", "none", "several". Including "no" would not catch the error it
+appears to — resolution is existence-based, so "no overdrafts" on a merchant with four would
+resolve against any other zero-valued fact.
 
 ## Verification result
 

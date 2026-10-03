@@ -34,6 +34,10 @@ class Tool:
     """
 
     name: str
+    # Short prefix the fact ledger keys on: `revenue.avg_monthly_revenue`, not
+    # `compute_revenue_metrics.avg_monthly_revenue`. Lives here so the namespace and the
+    # tool it belongs to cannot drift apart (data-model.md).
+    namespace: str
     description: str
     function: Callable[..., dict]
     parameters: dict[str, Any]
@@ -58,6 +62,7 @@ _TRANSACTIONS_PARAM = {
 TOOLS: tuple[Tool, ...] = (
     Tool(
         name="compute_revenue_metrics",
+        namespace="revenue",
         description=(
             "Monthly banked revenue and the measures derived from it: average, total, "
             "growth rate, trend direction and months covered. Run this first; the other "
@@ -78,6 +83,7 @@ TOOLS: tuple[Tool, ...] = (
     ),
     Tool(
         name="compute_volatility",
+        namespace="volatility",
         description=(
             "Revenue stability, measured after removing the trend. Returns a coefficient "
             "of variation, a stability score, and whether the history is too short to "
@@ -94,10 +100,11 @@ TOOLS: tuple[Tool, ...] = (
             },
             "required": ["monthly_revenue"],
         },
-        returns=("revenue_cv", "revenue_stdev", "stability_score", "insufficient_history"),
+        returns=("revenue_cv", "revenue_stdev", "stability_score", "stability_score_max", "insufficient_history"),
     ),
     Tool(
         name="detect_cashflow_flags",
+        namespace="flags",
         description=(
             "Cashflow risk indicators: overdraft episodes, returned payments, whether the "
             "balance has eroded, large one-off inflows, and the lowest balance seen."
@@ -116,6 +123,7 @@ TOOLS: tuple[Tool, ...] = (
     ),
     Tool(
         name="score_risk",
+        namespace="risk",
         description=(
             "Assign a risk score and tier from the revenue, volatility and flag results, "
             "or decline. Requires all three earlier analyses."
@@ -130,10 +138,20 @@ TOOLS: tuple[Tool, ...] = (
             },
             "required": ["revenue_metrics", "volatility", "flags"],
         },
-        returns=("risk_score", "risk_tier", "declined", "decline_reason", "drivers"),
+        returns=(
+            "risk_score",
+            "risk_score_max",
+            "decline_threshold",
+            "min_months_history",
+            "risk_tier",
+            "declined",
+            "decline_reason",
+            "drivers",
+        ),
     ),
     Tool(
         name="compute_offer",
+        namespace="offer",
         description=(
             "Compute the advance amount, repayment percentage, expected duration and total "
             "repayable, all within policy bounds. Requires the revenue metrics and the risk "

@@ -40,6 +40,7 @@ def compute_volatility(monthly_revenue: list[tuple[str, float]]) -> dict:
             "revenue_cv": 0.0,
             "revenue_stdev": 0.0,
             "stability_score": stability,
+            "stability_score_max": policy.SCORE_SCALE_MAX,
             "insufficient_history": insufficient,
         }
 
@@ -52,5 +53,6 @@ def compute_volatility(monthly_revenue: list[tuple[str, float]]) -> dict:
         "revenue_cv": round(cv, 6),
         "revenue_stdev": round(stdev, 2),
         "stability_score": stability,
+        "stability_score_max": policy.SCORE_SCALE_MAX,
         "insufficient_history": insufficient,
     }

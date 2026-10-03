@@ -40,10 +40,18 @@ order, because that is how the thing gets built. Phase 2 is where those two axes
 
 ## Known deviation from plan.md
 
-`ledgermind/data/load.py` (T008) is **not** in plan.md's module tree. The plan covers generating
-merchant data but never names the module that reads and validates it, while FR-001 and FR-002
-require exactly that. It is added here as a deliberate, recorded deviation rather than smuggled in.
-Reconcile with `/speckit-converge` at the end of Day 1.
+Three modules exist that plan.md's tree does not name. Each is recorded here rather than
+smuggled in; reconcile with `/speckit-converge`.
+
+- **`ledgermind/data/load.py`** (T008) — the plan covers generating merchant data but never
+  names the module that reads and validates it, while FR-001 and FR-002 require exactly that.
+- **`ledgermind/tools/trend.py`** (T009/T010) — both the revenue and volatility tools need the
+  trend fit, and sharing it is what stops them disagreeing about where the line sits.
+  Deliberately *not* shared with the generator, which keeps its own implementation so that
+  agreement between them is evidence rather than tautology.
+- **`ledgermind/agent/ledger.py`** (T021) — the plan put the fact ledger inside `loop.py`. Split
+  out so it can be tested without importing the loop, and so the loop stays the ~150 lines it is
+  meant to be.
 
 ---
 
@@ -94,15 +102,15 @@ verified.
 the memo resolves to a recorded fact, and every structured offer field is identical to the tool's
 return value rather than an approximation of it.
 
-- [ ] T017 [US1] Define the `Provider` protocol in `ledgermind/llm/base.py` — a chat call taking messages plus tool schemas and returning either a tool call or prose. No provider-specific request or response type may cross this boundary (plan.md)
+- [x] T017 [US1] Define the `Provider` protocol in `ledgermind/llm/base.py` — a chat call taking messages plus tool schemas and returning either a tool call or prose. No provider-specific request or response type may cross this boundary (plan.md)
 - [ ] T018 [US1] Implement `ledgermind/llm/ollama.py` as a plain-HTTP client against `http://127.0.0.1:11434` for model `qwen2.5`, satisfying the `Provider` protocol. Add `tests/test_ollama_provider.py` with the transport stubbed, so the suite does not require a running server
-- [ ] T019 [P] [US1] Define memo and offer structures in `ledgermind/agent/schema.py`. The offer carries the tool's return values; there is no field into which model-emitted numbers are parsed (Article I, FR-016)
+- [x] T019 [P] [US1] Define memo and offer structures in `ledgermind/agent/schema.py`. The offer carries the tool's return values; there is no field into which model-emitted numbers are parsed (Article I, FR-016)
 - [ ] T020 [P] [US1] Write the system and tool-selection prompts in `ledgermind/agent/prompts.py`, stating that the model selects analyses and writes prose only, and that it will never be given raw transaction rows (FR-015)
-- [ ] T021 [US1] Implement the fact ledger in `ledgermind/agent/loop.py` — `FactLedgerEntry` with `key` (namespaced `<tool>.<field>`), `value`, `tool`, `call_index`. Scalars register directly; **sequences register per element** so `monthly_revenue` becomes `revenue.monthly_revenue.2026-01` and each `large_one_offs` amount registers as `flags.large_one_offs.0.amount`. Add `tests/test_fact_ledger.py` asserting a single month's revenue figure is resolvable, since without per-element registration a legitimate memo quoting one month would fail grounding
+- [x] T021 [US1] Implement the fact ledger in `ledgermind/agent/loop.py` — `FactLedgerEntry` with `key` (namespaced `<tool>.<field>`), `value`, `tool`, `call_index`. Scalars register directly; **sequences register per element** so `monthly_revenue` becomes `revenue.monthly_revenue.2026-01` and each `large_one_offs` amount registers as `flags.large_one_offs.0.amount`. Add `tests/test_fact_ledger.py` asserting a single month's revenue figure is resolvable, since without per-element registration a legitimate memo quoting one month would fail grounding
 - [ ] T022 [US1] Implement the hand-rolled agent loop in `ledgermind/agent/loop.py` — drive the provider, parse tool calls, dispatch through `registry.py`, append results to the transcript, repeat until the model produces prose. The dispatcher registers each tool return to the ledger **before** appending it to the transcript, so the model can never see a value that is not already recorded. Only the dispatcher writes to the ledger (FR-012). The model's context carries merchant identity, period covered, and tool results only — never raw rows (FR-015)
-- [ ] T023 [US1] Implement `ledgermind/guardrail/grounding.py` — extract every numeral from prose including cardinals spelled as words, and resolve each against the ledger using only the declared ladder: nearest 1, 10, 100, 1000, or one decimal place (FR-018, FR-019). Resolution is existence-based: a value matching two facts still grounds, and provenance lists all matches. Add `tests/test_grounding.py` asserting `47,812` / `47,800` / `48,000` all resolve to a recorded `47812.34` while `52,000` and `50,000` do not
-- [ ] T024 [P] [US1] Implement `ledgermind/guardrail/policy.py` verifying offer terms against `ledgermind/policy.py` bounds, returning the specific bound breached. A breach is surfaced as a defect in the offer logic, not as prose to regenerate (FR-022)
-- [ ] T025 [US1] Implement `check_output` in `ledgermind/guardrail/check.py` composing the grounding and policy checks into a `VerificationResult` with `passed`, `unresolved_numerals`, `policy_breaches`, `incomplete`, `attempt`, `used_fallback`. It sits between the loop and every consumer, so no code path reaches a display without passing through it (Article II)
+- [x] T023 [US1] Implement `ledgermind/guardrail/grounding.py` — extract every numeral from prose including cardinals spelled as words, and resolve each against the ledger using only the declared ladder: nearest 1, 10, 100, 1000, or one decimal place (FR-018, FR-019). Resolution is existence-based: a value matching two facts still grounds, and provenance lists all matches. Add `tests/test_grounding.py` asserting `47,812` / `47,800` / `48,000` all resolve to a recorded `47812.34` while `52,000` and `50,000` do not
+- [x] T024 [P] [US1] Implement `ledgermind/guardrail/policy.py` verifying offer terms against `ledgermind/policy.py` bounds, returning the specific bound breached. A breach is surfaced as a defect in the offer logic, not as prose to regenerate (FR-022)
+- [x] T025 [US1] Implement `check_output` in `ledgermind/guardrail/check.py` composing the grounding and policy checks into a `VerificationResult` with `passed`, `unresolved_numerals`, `policy_breaches`, `incomplete`, `attempt`, `used_fallback`. It sits between the loop and every consumer, so no code path reaches a display without passing through it (Article II)
 - [ ] T026 [US1] Add `tests/test_us1_end_to_end.py` running one generated merchant through loop and guardrail, asserting a memo and offer are produced, every memo numeral resolves, and each structured offer field equals the tool's return value exactly
 
 **Checkpoint**: US1 is independently demonstrable — one merchant in, verified memo and offer out.
@@ -118,10 +126,10 @@ rather than silently.
 confirm rejection — **with no model involved** — then exhaust the retry allowance and confirm the
 labelled fallback appears.
 
-- [ ] T027 [US2] Add the completeness check to `ledgermind/guardrail/check.py` — a memo citing none of the decision's figures is rejected as incomplete, and a displayed memo must reference at least the advance amount, the repayment percentage, and one revenue metric (FR-021). Grounding alone rewards vagueness, so this closes the degenerate case where saying nothing scores perfectly
+- [x] T027 [US2] Add the completeness check to `ledgermind/guardrail/check.py` — a memo citing none of the decision's figures is rejected as incomplete, and a displayed memo must reference at least the advance amount, the repayment percentage, and one revenue metric (FR-021). Grounding alone rewards vagueness, so this closes the degenerate case where saying nothing scores perfectly
 - [ ] T028 [US2] Add bounded regeneration to `ledgermind/agent/loop.py` — a declared maximum attempt count from `ledgermind/policy.py`, with the unresolved numerals fed back to the model as the reason for rejection (FR-023)
-- [ ] T029 [US2] Implement the deterministic fallback memo in `ledgermind/guardrail/check.py`, templated from recorded facts alone and setting `used_fallback` (FR-024). It must carry an explicit notice that narrative verification failed; unverified prose is never displayed and the fallback is never substituted silently (FR-025)
-- [ ] T030 [US2] Add `tests/test_us2_rejection.py` — a hand-written memo containing a figure absent from the ledger is rejected; a memo whose numeral matches two different facts still passes; retries exhausted yields the fallback with `used_fallback` set. All without invoking a model, so the guardrail is provable independently of model behaviour
+- [x] T029 [US2] Implement the deterministic fallback memo in `ledgermind/guardrail/check.py`, templated from recorded facts alone and setting `used_fallback` (FR-024). It must carry an explicit notice that narrative verification failed; unverified prose is never displayed and the fallback is never substituted silently (FR-025)
+- [x] T030 [US2] Add `tests/test_us2_rejection.py` — a hand-written memo containing a figure absent from the ledger is rejected; a memo whose numeral matches two different facts still passes; retries exhausted yields the fallback with `used_fallback` set. All without invoking a model, so the guardrail is provable independently of model behaviour
 
 **Checkpoint**: the grounding guarantee is demonstrable on its own, independent of what the model does.
 

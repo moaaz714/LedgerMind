@@ -82,6 +82,9 @@ def score_risk(revenue_metrics: dict, volatility: dict, flags: dict) -> dict:
         # component only spans histories at or above the minimum.
         return {
             "risk_score": policy.DECLINE_RISK_SCORE,
+            "risk_score_max": policy.SCORE_SCALE_MAX,
+            "decline_threshold": policy.DECLINE_RISK_SCORE,
+            "min_months_history": policy.MIN_MONTHS_HISTORY,
             "risk_tier": None,
             "declined": True,
             "decline_reason": (
@@ -102,6 +105,14 @@ def score_risk(revenue_metrics: dict, volatility: dict, flags: dict) -> dict:
 
     return {
         "risk_score": risk_score,
+        "risk_score_max": policy.SCORE_SCALE_MAX,
+        # The bar this merchant was judged against, returned whether or not they were
+        # declined. `decline_reason` names these numbers in prose, and a memo explaining
+        # either outcome will naturally cite them -- so they have to be recorded facts, or
+        # an honest memo quoting the threshold would be rejected as fabricated. Same
+        # principle as FR-009.
+        "decline_threshold": policy.DECLINE_RISK_SCORE,
+        "min_months_history": policy.MIN_MONTHS_HISTORY,
         "risk_tier": tier,
         "declined": tier is None,
         "decline_reason": (
