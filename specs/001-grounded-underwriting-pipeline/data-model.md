@@ -42,7 +42,7 @@ numeral-match candidates.
 | `monthly_revenue` | `list[tuple[str, float]]` | each element | `("2026-01", 47812.34)`, ascending by month |
 | `avg_monthly_revenue` | `float` | yes | |
 | `total_revenue` | `float` | yes | |
-| `mom_growth_pct` | `float` | yes | Mean month-over-month change, percent. Also defines the trend line that `compute_volatility` subtracts |
+| `mom_growth_pct` | `float` | yes | Average geometric growth per month, by least squares on log revenue (FR-004). Also defines the trend line `compute_volatility` subtracts |
 | `months_covered` | `int` | yes | Whole months spanned. Exists to satisfy FR-009/FR-019. |
 | `period_start` | `str` | no | ISO date |
 | `period_end` | `str` | no | ISO date |
@@ -61,12 +61,12 @@ numeral-match candidates.
 
 | Field | Type | Groundable | Notes |
 |---|---|---|---|
-| `overdraft_count` | `int` | yes | |
+| `overdraft_count` | `int` | yes | **Episodes** — crossings from non-negative to negative balance, not negative rows (FR-006) |
 | `bounced_payment_count` | `int` | yes | |
 | `large_one_off_count` | `int` | yes | |
 | `flag_count` | `int` | yes | Total across all kinds |
 | `min_balance` | `float` | yes | Lowest balance observed |
-| `large_one_offs` | `list[dict]` | each `amount` | `{date, amount, description}` |
+| `large_one_offs` | `list[dict]` | each `amount` | `{date, amount, description}`. An inflow above `Q3 + 3×IQR` of the merchant's own inflows |
 | `declining_balance` | `bool` | no | |
 
 An empty result is a count of zero, never an absent fact (spec edge case).
@@ -135,6 +135,8 @@ Written by `data/gen.py` at generation time to `truth.json`, beside the merchant
 | `seed` | `int` | Reproduces this merchant exactly (FR-028) |
 | `true_monthly_revenue` | `list[tuple[str, float]]` | The series the generator actually produced |
 | `true_avg_monthly_revenue` | `float` | |
+| `true_total_revenue` | `float` | |
+| `true_mom_growth_pct` | `float` | Log-linear fit, matching FR-004 |
 | `true_revenue_cv` | `float` | |
 | `true_overdraft_count` | `int` | |
 | `true_bounced_payment_count` | `int` | |

@@ -159,13 +159,29 @@ MAX_DURATION_MONTHS = 12
 # Detection thresholds
 # --------------------------------------------------------------------------------------
 
-# An inflow above this fraction of average monthly revenue is a large one-off. Reported,
-# but not excluded from the revenue basis -- see the spec's Assumptions for why that
-# simplification was chosen and what it costs.
-LARGE_ONE_OFF_REVENUE_FRACTION = 0.25
+# An inflow is a large one-off when it exceeds Q3 + this multiple of the interquartile
+# range of the merchant's own inflows -- the standard outlier rule, with a wider multiple
+# than the usual 1.5 because the concept is a *large* one-off, not a mild outlier.
+#
+# Two earlier drafts failed, and both failed the same way: they normalised by level while
+# ignoring spread. A fraction of average monthly revenue depended on deposit cadence, and a
+# multiple of the median inflow depended on how erratic the merchant's deposits were -- it
+# reported up to fifteen one-offs for merchants that had none. Q3 + k*IQR adapts to each
+# merchant's own distribution, so an erratic merchant needs a bigger outlier to qualify.
+#
+# Known limit: for a highly erratic merchant no amount-based rule separates "one-off event"
+# from "exceptional trading week". This flag carries zero risk points precisely because of
+# that -- it informs the memo, it does not price the offer. See the spec's Assumptions.
+LARGE_ONE_OFF_IQR_MULTIPLE = 3.0
 
-# A balance strictly below this is an overdraft. Defined on the balance itself rather than
-# on description keywords, so detection stays deterministic.
+# A balance strictly below this is overdrawn. Defined on the balance itself rather than on
+# description keywords, so detection stays deterministic.
+#
+# `overdraft_count` counts EPISODES -- crossings from at-or-above this threshold to below
+# it -- not rows with a negative balance. A merchant who goes overdrawn and stays there
+# would otherwise score one per transaction: in testing, merchants asked for zero and two
+# overdrafts reported 96 and 137. "Three overdrafts" means three occasions, which is also
+# what an analyst reading the memo will understand it to mean.
 OVERDRAFT_BALANCE_THRESHOLD = 0.0
 
 BOUNCED_PAYMENT_KEYWORDS = frozenset(

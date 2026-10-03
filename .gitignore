@@ -30,3 +30,6 @@ CLAUDE.md
 
 # NOTE: .specify/ (constitution, spec, plan, tasks) is intentionally NOT ignored —
 # those artifacts are committed as part of the spec-driven-development story.
+
+# --- Generated merchant data (reproducible from seeds; see ledgermind/data/gen.py) ---
+data/merchants/
