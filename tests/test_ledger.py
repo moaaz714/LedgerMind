@@ -146,3 +146,79 @@ def test_an_empty_ledger_resolves_nothing(ledger):
     assert len(ledger) == 0
     assert ledger.resolve(1.0) == ()
     assert ledger.get("anything") is None
+
+
+# --- the magnitude condition on the ladder (FR-018) -----------------------------------
+
+
+def test_a_coarse_rung_does_not_apply_to_a_small_value():
+    """Read literally, the ladder let a number be rounded into a different number.
+
+    Nearest-10 of an overdraft count of 3 is zero, so "no overdrafts" resolved against a
+    count of three. Nearest-10 of a repayment rate of 13 is ten, so "repaid at 10%"
+    resolved against a rate of thirteen. Both are material misstatements that passed.
+    """
+    assert 0.0 not in rounding_candidates(3)
+    assert 10.0 not in rounding_candidates(13.0)
+    assert 100.0 not in rounding_candidates(95)
+    assert 0.0 not in rounding_candidates(0.4199)
+
+
+def test_the_recorded_value_always_resolves():
+    """Even when every rung is excluded, the figure quoted exactly must still ground."""
+    for value in (0, 3, 13.0, 0.4199, 1.9886):
+        assert float(value) in rounding_candidates(value), value
+
+
+def test_zero_still_resolves_against_a_real_zero():
+    ledger = FactLedger()
+    ledger.register("flags", "detect_cashflow_flags", {"overdraft_count": 0})
+    assert ledger.resolve(0.0) == ("flags.overdraft_count",)
+
+
+def test_zero_no_longer_resolves_against_a_non_zero_fact():
+    """The defect this condition exists to close."""
+    ledger = FactLedger()
+    ledger.register("flags", "detect_cashflow_flags", {"overdraft_count": 3})
+    ledger.register("volatility", "compute_volatility", {"revenue_cv": 0.4199})
+    assert ledger.resolve(0.0) == ()
+
+
+def test_large_values_keep_every_rung():
+    """The condition must not cost readability where rounding is genuinely sensible."""
+    candidates = rounding_candidates(47_812.34)
+    for allowed in (47_812.0, 47_810.0, 47_800.0, 48_000.0, 47_812.34):
+        assert allowed in candidates, allowed
+
+
+def test_a_small_decimal_keeps_its_one_decimal_rung():
+    """1.9886 loses nearest-1 but keeps one decimal place, so "2.0%" still resolves."""
+    candidates = rounding_candidates(1.9886)
+    assert 2.0 in candidates
+    assert 0.0 not in candidates
+
+
+@pytest.mark.parametrize(
+    "value,unit,rounded,applies",
+    [
+        # Values chosen so the rung under test produces a result no *other* rung produces.
+        # 999 would be useless here: nearest-100 is excluded, but nearest-10 of 999 is also
+        # 1000, so the value stays reachable and the assertion proves nothing.
+        (1_040.0, 100, 1_000.0, True),    # at least ten times the unit
+        (940.0, 100, 900.0, False),       # under ten times the unit
+        (104.0, 10, 100.0, True),
+        (94.0, 10, 90.0, False),
+        (10.4, 1, 10.0, True),
+        (9.4, 1, 9.0, False),
+    ],
+)
+def test_the_boundary_is_ten_times_the_unit(value, unit, rounded, applies):
+    assert float(round(value, -len(str(unit)) + 1)) == rounded, "fixture arithmetic"
+    present = rounded in rounding_candidates(value)
+    assert present is applies, (
+        f"{value}: nearest-{unit} rung should {'apply' if applies else 'not apply'}"
+    )
+
+
+def test_the_magnitude_multiple_is_declared_in_policy():
+    assert policy.GROUNDING_MIN_MAGNITUDE_MULTIPLE == 10

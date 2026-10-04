@@ -217,6 +217,15 @@ DECLINING_BALANCE_FRACTION = 0.75
 GROUNDING_ROUNDING_LADDER = (1, 10, 100, 1000)
 GROUNDING_DECIMAL_PLACES = 1
 
+# A rung applies only where the recorded value is at least this many times its unit.
+#
+# Without the condition the ladder, read literally, permits a number to be rounded into a
+# different number: nearest-10 of an overdraft count of 3 is zero, and nearest-10 of a
+# repayment rate of 13 is ten. So "no overdrafts" resolved against a count of three, and
+# "repaid at 10%" against a rate of thirteen -- material misstatements that passed. Ten
+# bounds the rounding error at 5% of the figure.
+GROUNDING_MIN_MAGNITUDE_MULTIPLE = 10
+
 MAX_REGENERATION_ATTEMPTS = 3
 
 

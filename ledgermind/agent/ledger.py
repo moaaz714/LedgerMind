@@ -87,10 +87,23 @@ def rounding_candidates(value: float) -> set[float]:
 
     The absolute value is included because prose describes an overdraft as "1,000
     overdrawn" as readily as "-1,000", and both refer to the same recorded fact.
+
+    **A rung applies only where the value is at least ten times its unit.** Read without
+    that condition the ladder permits nonsense: nearest-10 of an overdraft count of 3 is
+    zero, and nearest-10 of a repayment rate of 13 is ten -- so "no overdrafts" resolved
+    against a count of three, and "repaid at 10%" against a rate of thirteen. Both are
+    material misstatements, and both passed. The condition bounds the rounding error at 5%
+    of the figure, which is what the ladder was meant to express: that a memo may round
+    sensibly, not that it may round a number into a different number.
+
+    The recorded value itself is always a candidate, so a small figure quoted exactly still
+    resolves even when every rung is excluded.
     """
     candidates: set[float] = set()
     for magnitude in (value, abs(value)):
         for unit in policy.GROUNDING_ROUNDING_LADDER:
+            if abs(magnitude) < unit * policy.GROUNDING_MIN_MAGNITUDE_MULTIPLE:
+                continue
             digits = -len(str(unit)) + 1  # 1 -> 0, 10 -> -1, 100 -> -2, 1000 -> -3
             candidates.add(float(round(magnitude, digits)))
         candidates.add(float(round(magnitude, policy.GROUNDING_DECIMAL_PLACES)))
