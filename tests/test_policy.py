@@ -194,3 +194,44 @@ def test_grounding_ladder_is_ascending_powers_of_ten():
 
 def test_regeneration_attempts_are_bounded():
     assert 1 <= policy.MAX_REGENERATION_ATTEMPTS <= 5
+
+
+# --- sales reconciliation (T042, FR-034, FR-035) --------------------------------------
+
+
+def test_reconciliation_tolerances_are_positive():
+    assert policy.EXPECTED_PROCESSOR_FEE_PCT > 0
+    assert policy.RECONCILIATION_TOLERANCE_PCT > 0
+    assert policy.RECONCILIATION_MONTH_TOLERANCE_PCT > 0
+
+
+def test_the_month_tolerance_is_not_tighter_than_the_period_tolerance():
+    """Month boundaries are exactly where settlement timing bites.
+
+    A single month can legitimately sit well outside tolerance while the period as a whole
+    ties up, so a tighter per-month bound would flag honest merchants as evidence against
+    themselves.
+    """
+    assert policy.RECONCILIATION_MONTH_TOLERANCE_PCT >= policy.RECONCILIATION_TOLERANCE_PCT
+
+
+def test_the_generator_uses_the_fee_the_policy_expects():
+    """The one cross-module equality that has to hold.
+
+    Reconciliation asks whether banked cash matches what the sales records imply after the
+    processor's cut. If the generator's fee and the policy's expected fee drifted apart,
+    every honest merchant would fail reconciliation and be declined -- and the cause would
+    present as a bug in the tool rather than as two constants disagreeing.
+    """
+    from ledgermind.data import gen
+
+    assert gen.PROCESSOR_FEE_PCT * 100 == policy.EXPECTED_PROCESSOR_FEE_PCT
+
+
+def test_the_period_tolerance_leaves_room_for_the_fee_itself():
+    """A merchant banking exactly what the fee implies must reconcile comfortably.
+
+    If the tolerance were tighter than the fee, rounding on the fee alone could tip an
+    honest merchant over.
+    """
+    assert policy.RECONCILIATION_TOLERANCE_PCT > policy.EXPECTED_PROCESSOR_FEE_PCT

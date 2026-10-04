@@ -40,10 +40,18 @@ order, because that is how the thing gets built. Phase 2 is where those two axes
 
 ## Known deviation from plan.md
 
-`ledgermind/data/load.py` (T008) is **not** in plan.md's module tree. The plan covers generating
-merchant data but never names the module that reads and validates it, while FR-001 and FR-002
-require exactly that. It is added here as a deliberate, recorded deviation rather than smuggled in.
-Reconcile with `/speckit-converge` at the end of Day 1.
+Three modules exist that plan.md's tree does not name. Each is recorded here rather than
+smuggled in; reconcile with `/speckit-converge`.
+
+- **`ledgermind/data/load.py`** (T008) — the plan covers generating merchant data but never
+  names the module that reads and validates it, while FR-001 and FR-002 require exactly that.
+- **`ledgermind/tools/trend.py`** (T009/T010) — both the revenue and volatility tools need the
+  trend fit, and sharing it is what stops them disagreeing about where the line sits.
+  Deliberately *not* shared with the generator, which keeps its own implementation so that
+  agreement between them is evidence rather than tautology.
+- **`ledgermind/agent/ledger.py`** (T021) — the plan put the fact ledger inside `loop.py`. Split
+  out so it can be tested without importing the loop, and so the loop stays the ~150 lines it is
+  meant to be.
 
 ---
 
@@ -83,6 +91,24 @@ rather than fixtures invented to match the implementation.
 **Checkpoint — end of Day 1**: full test suite green, every financial figure in the system computed
 by a tool and verified against known truth, with no model involved yet.
 
+### Amendment A — sales reconciliation (FR-034, FR-035, SC-009)
+
+Raised after Day 1 closed: the sales export was a required, validated input that no tool read.
+These tasks add `reconcile_sales` and revisit T005, T007, T012, T014 and T016, which are already
+checked off. They **gate T022**: the loop must be built against the final tool set, so the registry
+the dispatcher consumes is settled before any model drives it. Article IV's order holds inside the
+amendment — policy first, generator second, tool and its tests third, wiring last.
+
+- [x] T042 [P] Add to `ledgermind/policy.py` the expected payment-processor fee, the period-level reconciliation tolerance, and the per-month tolerance, as named constants with a comment on why each value. Extend `tests/test_policy.py` with a static check that they are positive and that the per-month tolerance is not tighter than the period tolerance. The generator's own `PROCESSOR_FEE_PCT` must equal the policy's expected rate for a reconciling merchant, and a test asserts it, so the two cannot drift apart silently (FR-010, Article IV)
+- [x] T043 Extend `ledgermind/data/gen.py` with a `sales_scale` field on `MerchantSpec` (default 1.0; sales amounts are generated as that multiple of the reconciling value) and add `m21_recon_overstated` and `m22_recon_understated`, healthy profile, fixed seeds, scales clearly outside the tolerance in each direction. Write `true_total_sales`, `true_reconciliation_ratio` and `true_reconciles` to `truth.json` per data-model.md, computed from the generator's own arithmetic and **not** by importing the tool (Article III). Add a test asserting merchants m01–m20 regenerate byte-identical to before, so adding fixtures provably disturbs nothing existing (FR-028)
+- [x] T044 Implement `reconcile_sales` in `ledgermind/tools/reconcile.py` returning exactly the fields in data-model.md, over the union of months, excluding large one-offs from the banked side by the same rule as `flags.py` (share the threshold function rather than copy it). Stdlib only, pure. Add `tests/test_reconcile.py` asserting against a hand-computed fixture, a month with sales and no deposits, a month with deposits and no sales, a one-off inflow that must not count, an overshoot, and against every merchant's `truth.json`
+- [x] T045 Amend `score_risk` in `ledgermind/tools/scoring.py` to take `reconciliation` and decline when `reconciled` is false, history checked first, adding no risk points (FR-035). The decline reason names the ratio and tolerance. Update `tests/test_scoring.py`: the existing weight and tier assertions must pass unchanged, which is the proof the weights were not disturbed, and add cases for a reconciliation decline and for history taking precedence
+- [x] T046 Register `reconcile_sales` in `ledgermind/tools/registry.py` with namespace `reconcile`, parameters `transactions` and `sales` as labels, and add `reconciliation` to `score_risk`'s parameters. Correct the stale comment that says the model passes `sales` by name, which becomes true here. Update `tests/test_import_boundaries.py` if it enumerates tools. Depends on T044 and T045 passing
+- [x] T047 Extend `tests/test_tools_vs_truth.py` to the 22-merchant set and add the SC-009 assertion: m21 and m22 are declined for reconciliation and every other merchant is not. The loader already returns `sales` from `load_merchant`, so no loader change is expected; confirm that
+
+**Checkpoint — Amendment A**: full suite green over 22 merchants, SC-009 holding, every existing
+merchant's outcome unchanged.
+
 ---
 
 ## Phase 3: User Story 1 — Produce a verified offer for one merchant (Priority: P1)
@@ -94,16 +120,16 @@ verified.
 the memo resolves to a recorded fact, and every structured offer field is identical to the tool's
 return value rather than an approximation of it.
 
-- [ ] T017 [US1] Define the `Provider` protocol in `ledgermind/llm/base.py` — a chat call taking messages plus tool schemas and returning either a tool call or prose. No provider-specific request or response type may cross this boundary (plan.md)
-- [ ] T018 [US1] Implement `ledgermind/llm/ollama.py` as a plain-HTTP client against `http://127.0.0.1:11434` for model `qwen2.5`, satisfying the `Provider` protocol. Add `tests/test_ollama_provider.py` with the transport stubbed, so the suite does not require a running server
-- [ ] T019 [P] [US1] Define memo and offer structures in `ledgermind/agent/schema.py`. The offer carries the tool's return values; there is no field into which model-emitted numbers are parsed (Article I, FR-016)
-- [ ] T020 [P] [US1] Write the system and tool-selection prompts in `ledgermind/agent/prompts.py`, stating that the model selects analyses and writes prose only, and that it will never be given raw transaction rows (FR-015)
-- [ ] T021 [US1] Implement the fact ledger in `ledgermind/agent/loop.py` — `FactLedgerEntry` with `key` (namespaced `<tool>.<field>`), `value`, `tool`, `call_index`. Scalars register directly; **sequences register per element** so `monthly_revenue` becomes `revenue.monthly_revenue.2026-01` and each `large_one_offs` amount registers as `flags.large_one_offs.0.amount`. Add `tests/test_fact_ledger.py` asserting a single month's revenue figure is resolvable, since without per-element registration a legitimate memo quoting one month would fail grounding
-- [ ] T022 [US1] Implement the hand-rolled agent loop in `ledgermind/agent/loop.py` — drive the provider, parse tool calls, dispatch through `registry.py`, append results to the transcript, repeat until the model produces prose. The dispatcher registers each tool return to the ledger **before** appending it to the transcript, so the model can never see a value that is not already recorded. Only the dispatcher writes to the ledger (FR-012). The model's context carries merchant identity, period covered, and tool results only — never raw rows (FR-015)
-- [ ] T023 [US1] Implement `ledgermind/guardrail/grounding.py` — extract every numeral from prose including cardinals spelled as words, and resolve each against the ledger using only the declared ladder: nearest 1, 10, 100, 1000, or one decimal place (FR-018, FR-019). Resolution is existence-based: a value matching two facts still grounds, and provenance lists all matches. Add `tests/test_grounding.py` asserting `47,812` / `47,800` / `48,000` all resolve to a recorded `47812.34` while `52,000` and `50,000` do not
-- [ ] T024 [P] [US1] Implement `ledgermind/guardrail/policy.py` verifying offer terms against `ledgermind/policy.py` bounds, returning the specific bound breached. A breach is surfaced as a defect in the offer logic, not as prose to regenerate (FR-022)
-- [ ] T025 [US1] Implement `check_output` in `ledgermind/guardrail/check.py` composing the grounding and policy checks into a `VerificationResult` with `passed`, `unresolved_numerals`, `policy_breaches`, `incomplete`, `attempt`, `used_fallback`. It sits between the loop and every consumer, so no code path reaches a display without passing through it (Article II)
-- [ ] T026 [US1] Add `tests/test_us1_end_to_end.py` running one generated merchant through loop and guardrail, asserting a memo and offer are produced, every memo numeral resolves, and each structured offer field equals the tool's return value exactly
+- [x] T017 [US1] Define the `Provider` protocol in `ledgermind/llm/base.py` — a chat call taking messages plus tool schemas and returning either a tool call or prose. No provider-specific request or response type may cross this boundary (plan.md)
+- [x] T018 [US1] Implement `ledgermind/llm/ollama.py` as a plain-HTTP client against `http://127.0.0.1:11434` for model `qwen2.5`, satisfying the `Provider` protocol. Add `tests/test_ollama_provider.py` with the transport stubbed, so the suite does not require a running server
+- [x] T019 [P] [US1] Define memo and offer structures in `ledgermind/agent/schema.py`. The offer carries the tool's return values; there is no field into which model-emitted numbers are parsed (Article I, FR-016)
+- [x] T020 [P] [US1] Write the system and tool-selection prompts in `ledgermind/agent/prompts.py`, stating that the model selects analyses and writes prose only, and that it will never be given raw transaction rows (FR-015)
+- [x] T021 [US1] Implement the fact ledger in `ledgermind/agent/loop.py` — `FactLedgerEntry` with `key` (namespaced `<tool>.<field>`), `value`, `tool`, `call_index`. Scalars register directly; **sequences register per element** so `monthly_revenue` becomes `revenue.monthly_revenue.2026-01` and each `large_one_offs` amount registers as `flags.large_one_offs.0.amount`. Add `tests/test_fact_ledger.py` asserting a single month's revenue figure is resolvable, since without per-element registration a legitimate memo quoting one month would fail grounding
+- [x] T022 [US1] **(Blocked on Amendment A, T042–T047.)** Implement the hand-rolled agent loop in `ledgermind/agent/loop.py` — drive the provider, parse tool calls, dispatch through `registry.py`, append results to the transcript, repeat until the model produces prose. The dispatcher registers each tool return to the ledger **before** appending it to the transcript, so the model can never see a value that is not already recorded. Only the dispatcher writes to the ledger (FR-012). The model's context carries merchant identity, period covered, and tool results only — never raw rows (FR-015)
+- [x] T023 [US1] Implement `ledgermind/guardrail/grounding.py` — extract every numeral from prose including cardinals spelled as words, and resolve each against the ledger using only the declared ladder: nearest 1, 10, 100, 1000, or one decimal place (FR-018, FR-019). Resolution is existence-based: a value matching two facts still grounds, and provenance lists all matches. Add `tests/test_grounding.py` asserting `47,812` / `47,800` / `48,000` all resolve to a recorded `47812.34` while `52,000` and `50,000` do not
+- [x] T024 [P] [US1] Implement `ledgermind/guardrail/policy.py` verifying offer terms against `ledgermind/policy.py` bounds, returning the specific bound breached. A breach is surfaced as a defect in the offer logic, not as prose to regenerate (FR-022)
+- [x] T025 [US1] Implement `check_output` in `ledgermind/guardrail/check.py` composing the grounding and policy checks into a `VerificationResult` with `passed`, `unresolved_numerals`, `policy_breaches`, `incomplete`, `attempt`, `used_fallback`. It sits between the loop and every consumer, so no code path reaches a display without passing through it (Article II)
+- [x] T026 [US1] Add `tests/test_us1_end_to_end.py` running one generated merchant through loop and guardrail, asserting a memo and offer are produced, every memo numeral resolves, and each structured offer field equals the tool's return value exactly
 
 **Checkpoint**: US1 is independently demonstrable — one merchant in, verified memo and offer out.
 
@@ -118,10 +144,10 @@ rather than silently.
 confirm rejection — **with no model involved** — then exhaust the retry allowance and confirm the
 labelled fallback appears.
 
-- [ ] T027 [US2] Add the completeness check to `ledgermind/guardrail/check.py` — a memo citing none of the decision's figures is rejected as incomplete, and a displayed memo must reference at least the advance amount, the repayment percentage, and one revenue metric (FR-021). Grounding alone rewards vagueness, so this closes the degenerate case where saying nothing scores perfectly
-- [ ] T028 [US2] Add bounded regeneration to `ledgermind/agent/loop.py` — a declared maximum attempt count from `ledgermind/policy.py`, with the unresolved numerals fed back to the model as the reason for rejection (FR-023)
-- [ ] T029 [US2] Implement the deterministic fallback memo in `ledgermind/guardrail/check.py`, templated from recorded facts alone and setting `used_fallback` (FR-024). It must carry an explicit notice that narrative verification failed; unverified prose is never displayed and the fallback is never substituted silently (FR-025)
-- [ ] T030 [US2] Add `tests/test_us2_rejection.py` — a hand-written memo containing a figure absent from the ledger is rejected; a memo whose numeral matches two different facts still passes; retries exhausted yields the fallback with `used_fallback` set. All without invoking a model, so the guardrail is provable independently of model behaviour
+- [x] T027 [US2] Add the completeness check to `ledgermind/guardrail/check.py` — a memo citing none of the decision's figures is rejected as incomplete, and a displayed memo must reference at least the advance amount, the repayment percentage, and one revenue metric (FR-021). Grounding alone rewards vagueness, so this closes the degenerate case where saying nothing scores perfectly
+- [x] T028 [US2] Add bounded regeneration to `ledgermind/agent/loop.py` — a declared maximum attempt count from `ledgermind/policy.py`, with the unresolved numerals fed back to the model as the reason for rejection (FR-023)
+- [x] T029 [US2] Implement the deterministic fallback memo in `ledgermind/guardrail/check.py`, templated from recorded facts alone and setting `used_fallback` (FR-024). It must carry an explicit notice that narrative verification failed; unverified prose is never displayed and the fallback is never substituted silently (FR-025)
+- [x] T030 [US2] Add `tests/test_us2_rejection.py` — a hand-written memo containing a figure absent from the ledger is rejected; a memo whose numeral matches two different facts still passes; retries exhausted yields the fallback with `used_fallback` set. All without invoking a model, so the guardrail is provable independently of model behaviour
 
 **Checkpoint**: the grounding guarantee is demonstrable on its own, independent of what the model does.
 
@@ -131,12 +157,12 @@ labelled fallback appears.
 
 **Goal**: The central claim becomes a measured number rather than an assertion.
 
-**Independent test**: Run the evaluation across all 20 merchants and confirm the report carries a
+**Independent test**: Run the evaluation across all 22 merchants and confirm the report carries a
 figure for each of the five measures, each computed against recorded ground truth.
 
 - [ ] T031 [US3] Implement monotonicity in `ledgermind/eval/metrics.py` — for merchant pairs with equal revenue and differing volatility, assert the less stable merchant's advance is never larger (SC-001). Generate the paired fixtures via `ledgermind/data/gen.py`. This measure leads because it can fail while every other one passes, which makes it the one that tests the lending logic rather than the plumbing
 - [ ] T032 [US3] Add the remaining four measures to `ledgermind/eval/metrics.py` — grounding faithfulness as the proportion of displayed numerals resolving to a recorded fact (SC-002), policy-breach count (SC-003), run-to-run consistency over three runs of the same merchant asserting identical structured offer fields (SC-004), and tool-versus-truth agreement (SC-005)
-- [ ] T033 [US3] Implement `ledgermind/eval/harness.py` running the pipeline across all 20 merchants, collecting the five measures, and writing a report. Ground truth is read here and in `tests/` only (Article III)
+- [ ] T033 [US3] Implement `ledgermind/eval/harness.py` running the pipeline across all 22 merchants, collecting the five measures, and writing a report. Ground truth is read here and in `tests/` only (Article III)
 - [ ] T034 [US3] Add a CLI entry point for the harness and `tests/test_eval_harness.py` asserting the report contains every defined measure
 
 **Checkpoint**: the claim is now a number anyone can re-run.
@@ -163,7 +189,7 @@ analyses ran, what each returned, and which analysis produced any given figure i
 
 - [ ] T039 Write `README.md` covering setup, how to generate merchants, how to run the pipeline, and how to run the evaluation — absorbing the `quickstart.md` content deliberately deferred in plan.md
 - [ ] T040 Run `/speckit-converge` and reconcile this file against what was actually built, appending any remaining work as new tasks
-- [ ] T041 Run the constitution's demonstration gate — full test suite green and the eval harness reporting grounding faithfulness and policy compliance over all 20 merchants
+- [ ] T041 Run the constitution's demonstration gate — full test suite green and the eval harness reporting grounding faithfulness and policy compliance over all 22 merchants
 
 ---
 
@@ -176,6 +202,9 @@ Phase 1 (T001-T003)
          │   T005,T007 gen ──► T009-T013       (tests assert vs known truth)
          │   T008 load ──► T009, T011          (tools need parsed records)
          │   T009,T010,T011 [P] ──► T012 ──► T013 ──► T014 registry
+         │
+         │   Amendment A (T042-T047): T042 ──► T043 ──► T044 ──► T045 ──► T046 ──► T047
+         │                            └─ gates T022; revisits T005, T007, T012, T014, T016
          │
          ├─► Phase 3 US1 (T017-T026)   ← Day 2
          │     T017 ──► T018; T021 ──► T022; T023,T024 ──► T025 ──► T026

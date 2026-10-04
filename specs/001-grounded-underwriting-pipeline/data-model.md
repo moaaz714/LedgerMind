@@ -53,8 +53,10 @@ numeral-match candidates.
 | Field | Type | Groundable | Notes |
 |---|---|---|---|
 | `revenue_cv` | `float` | yes | **Detrended**: `revenue_stdev ÷ mean(monthly_revenue)`. See FR-005 |
+| `revenue_cv_pct` | `float` | yes | The same figure as a percentage. The first real model run produced "7.01%" for a recorded 0.0701 — honest arithmetic with no fact behind it — so the percentage prose reaches for has to be recorded (FR-009) |
 | `revenue_stdev` | `float` | yes | Standard deviation of the **residuals** after subtracting the trend line |
 | `stability_score` | `int` | yes | 0–100, derived from `revenue_cv` via `policy.py` bands |
+| `stability_score_max` | `int` | yes | The scale (100). Returned so prose may write "95 out of 100" — a bare denominator with no recorded value behind it is rejected as fabricated |
 | `insufficient_history` | `bool` | no | `True` when months < the policy minimum (thin-file edge case) |
 
 ### `detect_cashflow_flags(transactions) -> dict`
@@ -71,15 +73,41 @@ numeral-match candidates.
 
 An empty result is a count of zero, never an absent fact (spec edge case).
 
-### `score_risk(revenue_metrics, volatility, flags) -> dict`
+### `reconcile_sales(transactions, sales) -> dict`
+
+Compares what the sales export says should have been banked against what was banked (FR-034). Per
+calendar month over the union of both periods: expected banked = sales × (1 − expected processor
+fee); banked = inflows excluding large one-offs (the same rule `detect_cashflow_flags` applies).
+
+| Field | Type | Groundable | Notes |
+|---|---|---|---|
+| `sales_total` | `float` | yes | Gross, as listed in the sales export |
+| `expected_banked_total` | `float` | yes | `sales_total` net of the policy's expected processor fee |
+| `banked_total` | `float` | yes | Inflows actually received, large one-offs excluded |
+| `reconciliation_ratio` | `float` | yes | **The median of the per-month ratios** of banked to expected. 1.0 is a perfect match. This is the decision figure, and the one a decline memo must cite. Robust to one-off exclusion distorting a minority of months — see FR-034 |
+| `reconciliation_ratio_pct` | `float` | yes | The same figure as a percentage. Prose reaches for "banked 74% of what sales imply", and `0.74` is two decimal places — not a rung on the ladder — so the readable phrasing needs a groundable figure behind it (FR-009) |
+| `period_ratio` | `float` | yes | `banked_total ÷ expected_banked_total`. Reported as evidence, not used for the decision. The tool never divides by zero because the sales export is validated non-empty with every amount positive |
+| `months_compared` | `int` | yes | Months in the union of both periods. Exists to satisfy FR-009/FR-019 |
+| `mismatched_month_count` | `int` | yes | Months whose own ratio is outside the per-month tolerance. Evidence, not a decision input |
+| `max_month_gap_pct` | `float` | yes | Largest single-month absolute deviation from a ratio of 1.0, as a percentage |
+| `reconciliation_tolerance_pct` | `float` | yes | The period-level tolerance that was applied, returned so a decline memo can cite it |
+| `reconciled` | `bool` | no | `True` when the period-level ratio is within tolerance, in both directions |
+
+### `score_risk(revenue_metrics, volatility, flags, reconciliation) -> dict`
 
 | Field | Type | Groundable | Notes |
 |---|---|---|---|
 | `risk_score` | `int` | yes | 0–100, computed from `policy.py` weights |
+| `risk_score_max` | `int` | yes | The scale (100), for the same reason as `stability_score_max` |
+| `decline_threshold` | `int` | yes | The score at which a merchant is refused. Returned whether or not they were |
+| `min_months_history` | `int` | yes | The history floor. `decline_reason` names both of these in prose, so a memo explaining either outcome can cite them |
 | `risk_tier` | `str \| None` | no | `"A"` \| `"B"` \| `"C"` \| `"D"`, or **None when declined** — a refused merchant has no tier, and inventing one would put a misleading grade in front of an analyst |
 | `declined` | `bool` | no | |
-| `decline_reason` | `str \| None` | no | Set only when `declined` |
+| `decline_reason` | `str \| None` | no | Set only when `declined`. Two causes: history below the minimum, checked first, or a period that does not reconcile (FR-035). A reconciliation decline names `reconciliation_ratio` and `reconciliation_tolerance_pct`, both already recorded as facts by `reconcile_sales` |
 | `drivers` | `list[str]` | no | Non-numeric reasons, for the memo to draw on |
+
+`reconciliation` is `reconcile_sales`'s full return. It decides whether to decline and adds **no**
+risk points, so the 40/25/25/10 weights are unchanged (FR-035).
 
 ### `compute_offer(revenue_metrics, risk) -> dict`
 
@@ -117,7 +145,12 @@ An empty result is a count of zero, never an absent fact (spec edge case).
    `amount` as `flags.large_one_offs.0.amount`. Without this, a memo citing a single month's revenue
    would fail grounding despite the figure being entirely legitimate.
 5. **Non-numeric values are still registered**, for provenance display, but are not candidates for
-   numeral resolution.
+   numeral resolution. Booleans are excluded explicitly: `isinstance(True, int)` holds in Python, so
+   without that a memo containing "1" would resolve against every false-valued flag.
+6. **A figure the prose will naturally use must exist as a fact.** Scale denominators and the
+   thresholds a decision was judged against are returned by the tools for this reason (FR-009).
+   Otherwise an honest memo writing "72 out of 100" or "below our 6-month minimum" would be
+   rejected, because 100 and 6 would appear nowhere in the ledger.
 
 ### Resolution
 
@@ -144,11 +177,30 @@ Written by `data/gen.py` at generation time to `truth.json`, beside the merchant
 | `true_bounced_payment_count` | `int` | |
 | `true_large_one_off_count` | `int` | |
 | `true_months_covered` | `int` | |
+| `true_total_sales` | `float` | Sum of the sales export as generated |
+| `true_reconciliation_ratio` | `float` | Realised banked ÷ expected banked, as built. A reconciling merchant sits at 1.0; a fixture sits deliberately away from it |
+| `true_reconciles` | `bool` | Whether the generator intended the merchant's records to agree |
 
 Importable **only** by `tests/` and `eval/` (Article III). Enforced by a test that walks the imports
 of `tools/`, `agent/`, `guardrail/`, and `app/` and fails if any of them reach truth — a structural
 guarantee rather than a convention, because a convenience import during debugging is exactly how this
 kind of rule dies.
+
+### Numeral extraction
+
+Extraction errs toward catching too much, because the two failure directions are not
+symmetric: a false rejection costs one regeneration, while a numeral the scanner *misses* is
+displayed to the analyst having never been checked. Spelled cardinals therefore run to one
+hundred including compounds ("ninety-two"), not merely to twenty.
+
+Three exemptions, each narrow: ISO date strings are stripped before scanning; bare integers
+in 1900–2100 with no separator, decimal, currency or percent are calendar years rather than
+figures; and hyphens are excluded from the cardinal word boundary so "one-off" is not the
+number one, while genuine compounds are matched as a unit first.
+
+Not treated as numerals: "no", "none", "several". Including "no" would not catch the error it
+appears to — resolution is existence-based, so "no overdrafts" on a merchant with four would
+resolve against any other zero-valued fact.
 
 ## Verification result
 

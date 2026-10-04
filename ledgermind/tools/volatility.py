@@ -38,8 +38,10 @@ def compute_volatility(monthly_revenue: list[tuple[str, float]]) -> dict:
         stability, _ = policy.volatility_band(0.0)
         return {
             "revenue_cv": 0.0,
+            "revenue_cv_pct": 0.0,
             "revenue_stdev": 0.0,
             "stability_score": stability,
+            "stability_score_max": policy.SCORE_SCALE_MAX,
             "insufficient_history": insufficient,
         }
 
@@ -50,7 +52,13 @@ def compute_volatility(monthly_revenue: list[tuple[str, float]]) -> dict:
 
     return {
         "revenue_cv": round(cv, 6),
+        # The same figure as a percentage. The first real run showed the model converting
+        # the coefficient itself -- it wrote "7.01%" for a recorded 0.0701, honest
+        # arithmetic with no fact behind it. Prose reaches for a percentage here, so the
+        # percentage has to be a recorded value (FR-009).
+        "revenue_cv_pct": round(cv * 100, 4),
         "revenue_stdev": round(stdev, 2),
         "stability_score": stability,
+        "stability_score_max": policy.SCORE_SCALE_MAX,
         "insufficient_history": insufficient,
     }

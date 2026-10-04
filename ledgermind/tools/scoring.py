@@ -69,24 +69,66 @@ def _drivers(revenue_metrics: dict, volatility: dict, flags: dict) -> list[str]:
     return drivers
 
 
-def score_risk(revenue_metrics: dict, volatility: dict, flags: dict) -> dict:
+def score_risk(
+    revenue_metrics: dict, volatility: dict, flags: dict, reconciliation: dict | None = None
+) -> dict:
     """Assign a risk score and tier, or decline.
 
     `risk_tier` is None when declined: a refused merchant has no tier, and inventing one
     would put a misleading grade in front of an analyst.
+
+    `reconciliation` decides whether to decline and contributes **no risk points** (FR-035).
+    Revenue that cannot be verified is not a riskier version of the same merchant, it is an
+    unknown one, and awarding it points would price a figure nobody has confirmed. Leaving
+    it out of the score also keeps the 40/25/25/10 weights, and the argument for them,
+    exactly as they were -- which is what the unchanged weight assertions in test_scoring
+    prove.
+
+    Optional so the four-argument call sites added by Amendment A can be introduced without
+    breaking the three-argument ones; a merchant with no reconciliation supplied is simply
+    not checked for it.
     """
     drivers = _drivers(revenue_metrics, volatility, flags)
+    if reconciliation is not None and not reconciliation["reconciled"]:
+        drivers.append("banked revenue does not match the sales records for the period")
 
     if volatility["insufficient_history"]:
         # Too short to assess. Declined before scoring, because the score's history
         # component only spans histories at or above the minimum.
         return {
             "risk_score": policy.DECLINE_RISK_SCORE,
+            "risk_score_max": policy.SCORE_SCALE_MAX,
+            "decline_threshold": policy.DECLINE_RISK_SCORE,
+            "min_months_history": policy.MIN_MONTHS_HISTORY,
             "risk_tier": None,
             "declined": True,
             "decline_reason": (
                 f"history of {revenue_metrics['months_covered']} months is below the "
                 f"minimum of {policy.MIN_MONTHS_HISTORY}"
+            ),
+            "drivers": drivers,
+        }
+
+    if reconciliation is not None and not reconciliation["reconciled"]:
+        # History is checked first (FR-035): a file too short to assess is declined for
+        # being too short, not for failing a comparison that short files make unreliable.
+        return {
+            "risk_score": policy.DECLINE_RISK_SCORE,
+            "risk_score_max": policy.SCORE_SCALE_MAX,
+            "decline_threshold": policy.DECLINE_RISK_SCORE,
+            "min_months_history": policy.MIN_MONTHS_HISTORY,
+            "risk_tier": None,
+            "declined": True,
+            # Names the ratio and the tolerance, both already recorded as facts by
+            # reconcile_sales, so a decline memo can cite them and ground.
+            # One decimal place, and expressed as a percentage: the ratio itself is a
+            # small decimal that cannot be written at a permitted precision, so quoting it
+            # directly would make this reason ungroundable and no decline memo could cite
+            # it. Caught by test_loop when the first decline memo failed verification.
+            "decline_reason": (
+                f"banked revenue is {reconciliation['reconciliation_ratio_pct']:.1f}% of "
+                f"what the sales records imply, outside the tolerance of "
+                f"{reconciliation['reconciliation_tolerance_pct']:.1f}%"
             ),
             "drivers": drivers,
         }
@@ -102,6 +144,14 @@ def score_risk(revenue_metrics: dict, volatility: dict, flags: dict) -> dict:
 
     return {
         "risk_score": risk_score,
+        "risk_score_max": policy.SCORE_SCALE_MAX,
+        # The bar this merchant was judged against, returned whether or not they were
+        # declined. `decline_reason` names these numbers in prose, and a memo explaining
+        # either outcome will naturally cite them -- so they have to be recorded facts, or
+        # an honest memo quoting the threshold would be rejected as fabricated. Same
+        # principle as FR-009.
+        "decline_threshold": policy.DECLINE_RISK_SCORE,
+        "min_months_history": policy.MIN_MONTHS_HISTORY,
         "risk_tier": tier,
         "declined": tier is None,
         "decline_reason": (

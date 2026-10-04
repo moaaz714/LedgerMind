@@ -185,3 +185,81 @@ def test_real_merchants_span_the_tiers(merchants):
 
     assert {"A", "B", "C", "D"} <= seen, f"tiers missing from the merchant set: {seen}"
     assert None in seen, "no merchant in the set is declined"
+
+
+# --- reconciliation (T045, FR-035) ----------------------------------------------------
+
+
+def _reconciliation(reconciled=True, ratio=1.0):
+    return {
+        "sales_total": 100_000.0,
+        "expected_banked_total": 97_500.0,
+        "banked_total": 97_500.0 * ratio,
+        "reconciliation_ratio": ratio,
+        "reconciliation_ratio_pct": round(ratio * 100, 4),
+        "period_ratio": ratio,
+        "months_compared": 15,
+        "mismatched_month_count": 0 if reconciled else 15,
+        "max_month_gap_pct": abs(ratio - 1) * 100,
+        "reconciliation_tolerance_pct": policy.RECONCILIATION_TOLERANCE_PCT,
+        "reconciled": reconciled,
+    }
+
+
+def test_a_non_reconciling_merchant_is_declined():
+    result = score_risk(_metrics(), _volatility(), _flags(), _reconciliation(reconciled=False, ratio=0.74))
+    assert result["declined"] is True
+    assert result["risk_tier"] is None
+    assert "74.0%" in result["decline_reason"]
+    assert f"{policy.RECONCILIATION_TOLERANCE_PCT:.1f}%" in result["decline_reason"]
+
+
+def test_a_reconciling_merchant_is_unaffected():
+    """FR-035: reconciliation adds no risk points.
+
+    The same merchant scored with and without a passing reconciliation must land on the
+    same score and tier -- otherwise the declared weights no longer describe the score.
+    """
+    without = score_risk(_metrics(growth=-3.0), _volatility(cv=0.3), _flags(overdrafts=1))
+    with_recon = score_risk(
+        _metrics(growth=-3.0), _volatility(cv=0.3), _flags(overdrafts=1), _reconciliation()
+    )
+    assert without["risk_score"] == with_recon["risk_score"]
+    assert without["risk_tier"] == with_recon["risk_tier"]
+
+
+def test_reconciliation_adds_no_points_even_when_it_fails():
+    """A failing reconciliation declines outright; it must not also inflate the score.
+
+    The score it reports is the decline threshold, the same marker a thin file produces --
+    not a number derived from the mismatch.
+    """
+    failing = score_risk(_metrics(), _volatility(), _flags(), _reconciliation(reconciled=False))
+    assert failing["risk_score"] == policy.DECLINE_RISK_SCORE
+
+
+def test_history_is_checked_before_reconciliation():
+    """FR-035: a file too short to assess is declined for being too short.
+
+    Reconciliation over a handful of months is unreliable, so the more fundamental problem
+    must be the one reported.
+    """
+    result = score_risk(
+        _metrics(months=policy.MIN_MONTHS_HISTORY - 1),
+        _volatility(insufficient=True),
+        _flags(),
+        _reconciliation(reconciled=False),
+    )
+    assert "below the minimum" in result["decline_reason"]
+    assert "reconciles" not in result["decline_reason"]
+
+
+def test_a_failing_reconciliation_appears_in_the_drivers():
+    result = score_risk(_metrics(), _volatility(), _flags(), _reconciliation(reconciled=False))
+    assert any("sales records" in driver for driver in result["drivers"])
+
+
+def test_omitting_reconciliation_leaves_scoring_unchanged():
+    """The argument is optional so the three-argument call sites still work."""
+    result = score_risk(_metrics(), _volatility(), _flags())
+    assert result["declined"] is False

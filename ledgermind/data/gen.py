@@ -128,6 +128,16 @@ class MerchantSpec:
     declining_balance: bool = False
     large_one_offs: int = 0
     near_zero_month: bool = False
+
+    # Multiplier on the sales amounts only. At 1.0 the sales export and the bank statement
+    # agree once the processor fee is allowed for, which is what every honest merchant
+    # looks like. Away from 1.0 the two records contradict each other by that factor, which
+    # is what reconciliation exists to catch (FR-034).
+    #
+    # Scales the SALES side rather than the banked side on purpose: the bank statement is
+    # the harder record to falsify, so an overstated sales export is the realistic shape of
+    # the problem -- a merchant claiming revenue that never arrived.
+    sales_scale: float = 1.0
     seed: int = 0
 
 
@@ -176,6 +186,16 @@ MERCHANT_SPECS: tuple[MerchantSpec, ...] = (
     MerchantSpec("m18_thin_5mo", "thin_file", 5, 60_000, 0.08, 2.0, seed=118),
     MerchantSpec("m19_thin_7mo", "thin_file", 7, 35_000, 0.15, 1.0, seed=119),
     MerchantSpec("m20_thin_10mo", "thin_file", 10, 45_000, 0.16, 2.0, seed=120),
+    # --- reconciliation fixtures: healthy in every other respect, so the decline can only
+    # --- come from the sales records contradicting the bank statement (SC-009) ---
+    MerchantSpec(
+        "m21_recon_overstated", "healthy", 15, 45_000, 0.10, 1.0,
+        sales_scale=1.35, seed=121,
+    ),
+    MerchantSpec(
+        "m22_recon_understated", "healthy", 15, 45_000, 0.10, 1.0,
+        sales_scale=0.70, seed=122,
+    ),
 )
 
 MONOTONICITY_PAIRS = (
@@ -452,6 +472,19 @@ def _build_transactions(
 
         transactions.append({**row, "balance": balance})
 
+    # Scale the sales export AFTER the deposits were derived from it, so the bank statement
+    # stays the honest record and only the sales file contradicts it. Applied here rather
+    # than inside _sales_for_month because scaling before batching would scale the deposits
+    # too, and the two records would still agree -- the merchant would just be bigger.
+    #
+    # Everything else about the merchant is therefore identical to a scale-1.0 build:
+    # revenue, volatility and flags all read the bank statement, which is untouched. That
+    # isolates reconciliation as the only variable the fixture changes.
+    if spec.sales_scale != 1.0:
+        all_sales = [
+            {**sale, "amount": round(sale["amount"] * spec.sales_scale, 2)} for sale in all_sales
+        ]
+
     all_sales.sort(key=lambda s: s["date"])
     monthly = [
         (start.strftime("%Y-%m"), inflow_by_month.get(start.strftime("%Y-%m"), 0.0)) for start in months
@@ -461,6 +494,7 @@ def _build_transactions(
         "overdraft_count": overdraft_episodes,
         "bounced_payment_count": bounced_count,
         "large_one_off_count": one_off_count,
+        "sales_total": round(sum(sale["amount"] for sale in all_sales), 2),
     }
     return transactions, all_sales, realised
 
@@ -490,6 +524,15 @@ def build_merchant(spec: MerchantSpec) -> tuple[list[dict], list[dict], dict]:
         "true_bounced_payment_count": realised["bounced_payment_count"],
         "true_large_one_off_count": realised["large_one_off_count"],
         "true_months_covered": spec.months,
+        # Reconciliation truth, stated from the construction rather than measured from the
+        # files. The generator built the deposits to match the sales exactly, then scaled
+        # the sales by `sales_scale` -- so banked over expected is 1 / sales_scale in every
+        # month, and therefore so is the median. Computing it this way keeps truth
+        # independent of the tool, which has to recover the same figure from the CSVs.
+        "true_total_sales": realised["sales_total"],
+        "true_reconciliation_ratio": round(1.0 / spec.sales_scale, 6),
+        "true_reconciles": abs(1.0 / spec.sales_scale - 1.0) * 100
+        <= policy.RECONCILIATION_TOLERANCE_PCT,
     }
     return transactions, sales, truth
 
