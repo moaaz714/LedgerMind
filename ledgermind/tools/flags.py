@@ -16,7 +16,7 @@ import statistics
 from ledgermind import policy
 
 
-def _one_off_threshold(inflows: list[float]) -> float:
+def one_off_threshold(inflows: list[float]) -> float:
     """Q3 + k*IQR over the merchant's own inflows (policy.LARGE_ONE_OFF_IQR_MULTIPLE).
 
     Relative to the merchant's own spread, not to their revenue level. Two earlier
@@ -51,7 +51,7 @@ def detect_cashflow_flags(transactions: list[dict]) -> dict:
         raise ValueError("detect_cashflow_flags requires at least one transaction")
 
     inflows = [row["amount"] for row in transactions if row["amount"] > 0]
-    threshold = _one_off_threshold(inflows)
+    threshold = one_off_threshold(inflows)
 
     overdraft_count = 0
     bounced_payment_count = 0

@@ -20,6 +20,7 @@ from typing import Any, Callable
 
 from ledgermind.tools.flags import detect_cashflow_flags
 from ledgermind.tools.offer import compute_offer
+from ledgermind.tools.reconcile import reconcile_sales
 from ledgermind.tools.revenue import compute_revenue_metrics
 from ledgermind.tools.scoring import score_risk
 from ledgermind.tools.volatility import compute_volatility
@@ -44,10 +45,10 @@ class Tool:
     returns: tuple[str, ...]
 
 
-# The agent is never handed raw transaction rows (FR-015). It passes `transactions` and
-# `sales` by name and the dispatcher substitutes the loaded data, so the model can ask for
-# an analysis without ever seeing the records it runs on -- which is what makes Article I
-# structural rather than a prompt instruction.
+# The agent is never handed raw transaction rows or sales rows (FR-015). It names the input
+# it wants -- `transactions`, `sales` -- and the dispatcher substitutes the loaded data, so
+# the model can ask for an analysis without ever seeing the records it runs on. That is what
+# makes Article I structural rather than a prompt instruction.
 _TRANSACTIONS_PARAM = {
     "type": "object",
     "properties": {
@@ -122,11 +123,42 @@ TOOLS: tuple[Tool, ...] = (
         ),
     ),
     Tool(
+        name="reconcile_sales",
+        namespace="reconcile",
+        description=(
+            "Check the sales export against the bank statement: whether the money the sales "
+            "records imply should have been banked actually was, month by month. Returns the "
+            "median monthly ratio, the period totals, and whether the period reconciles. "
+            "Requires both inputs."
+        ),
+        function=reconcile_sales,
+        parameters={
+            "type": "object",
+            "properties": {
+                "transactions": {"type": "string", "description": "Always 'transactions'."},
+                "sales": {"type": "string", "description": "Always 'sales'."},
+            },
+            "required": ["transactions", "sales"],
+        },
+        returns=(
+            "sales_total",
+            "expected_banked_total",
+            "banked_total",
+            "reconciliation_ratio",
+            "period_ratio",
+            "months_compared",
+            "mismatched_month_count",
+            "max_month_gap_pct",
+            "reconciliation_tolerance_pct",
+            "reconciled",
+        ),
+    ),
+    Tool(
         name="score_risk",
         namespace="risk",
         description=(
-            "Assign a risk score and tier from the revenue, volatility and flag results, "
-            "or decline. Requires all three earlier analyses."
+            "Assign a risk score and tier from the revenue, volatility, flag and "
+            "reconciliation results, or decline. Requires all four earlier analyses."
         ),
         function=score_risk,
         parameters={
@@ -135,8 +167,9 @@ TOOLS: tuple[Tool, ...] = (
                 "revenue_metrics": {"type": "string", "description": "Always 'revenue_metrics'."},
                 "volatility": {"type": "string", "description": "Always 'volatility'."},
                 "flags": {"type": "string", "description": "Always 'flags'."},
+                "reconciliation": {"type": "string", "description": "Always 'reconciliation'."},
             },
-            "required": ["revenue_metrics", "volatility", "flags"],
+            "required": ["revenue_metrics", "volatility", "flags", "reconciliation"],
         },
         returns=(
             "risk_score",

@@ -186,6 +186,35 @@ MAX_DURATION_MONTHS = 12
 # that -- it informs the memo, it does not price the offer. See the spec's Assumptions.
 LARGE_ONE_OFF_IQR_MULTIPLE = 3.0
 
+# --------------------------------------------------------------------------------------
+# Sales reconciliation (FR-034, FR-035)
+# --------------------------------------------------------------------------------------
+
+# The processor fee we expect to sit between gross sales and banked deposits. Reconciliation
+# compares what the sales export implies should have arrived against what actually did, so
+# this rate defines "should have arrived". The generator uses the same figure for a
+# reconciling merchant, and a test asserts the two are equal -- if they drifted apart, every
+# honest merchant would fail reconciliation and the cause would look like a tool bug.
+EXPECTED_PROCESSOR_FEE_PCT = 2.5
+
+# How far the period-level ratio of banked to expected may sit from 1.0 before the merchant
+# is refused. Generous enough to absorb ordinary timing -- a week of December sales banking
+# in January shifts both months without the period total moving much -- and tight enough
+# that revenue which is not arriving shows up.
+RECONCILIATION_TOLERANCE_PCT = 8.0
+
+# The same comparison per calendar month, used only as evidence in the memo. Looser than the
+# period tolerance because month boundaries are exactly where settlement timing bites: a
+# single month can legitimately be well out while the period as a whole ties up.
+RECONCILIATION_MONTH_TOLERANCE_PCT = 20.0
+
+# The ratio recorded for a month that banked money against no sales at all. Such a month
+# has no expected figure to divide by, and the deviation is in principle unbounded, so it is
+# recorded as a full 100% mismatch rather than as infinity -- a number the median can work
+# with and a memo can quote. The reverse case needs no constant: sales with nothing banked
+# is simply a ratio of zero.
+RECONCILIATION_UNMATCHED_MONTH_RATIO = 2.0
+
 # A balance strictly below this is overdrawn. Defined on the balance itself rather than on
 # description keywords, so detection stays deterministic.
 #

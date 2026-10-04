@@ -157,13 +157,21 @@ def test_revenue_is_net_of_the_processor_fee(generated, spec):
     """Gross sales must exceed banked revenue by exactly the fee, excluding one-offs.
 
     A one-off is banked without being a sale, so it is subtracted before comparing.
+
+    `sales_scale` is divided out. The deposits were derived from the unscaled sales and the
+    export was scaled afterwards, so the fee relationship holds against the pre-scale
+    figure -- which is exactly what makes the reconciliation fixtures fail reconciliation
+    while leaving their bank statement honest. This assertion caught both of them when they
+    were added, which is the behaviour wanted from it: the relationship it guards is real,
+    and a merchant built to break it must be declared rather than slipped past.
     """
     sales = sum(float(r["amount"]) for r in _rows(generated, spec.merchant_id, "sales.csv"))
     rows = _rows(generated, spec.merchant_id, "transactions.csv")
     settled = sum(
         float(r["amount"]) for r in rows if r["description"] == gen.SETTLEMENT_DESCRIPTION
     )
-    assert settled == pytest.approx(sales * (1 - gen.PROCESSOR_FEE_PCT), rel=1e-6)
+    unscaled_sales = sales / spec.sales_scale
+    assert settled == pytest.approx(unscaled_sales * (1 - gen.PROCESSOR_FEE_PCT), rel=1e-6)
 
 
 # --- coverage the merchant set must guarantee -----------------------------------------

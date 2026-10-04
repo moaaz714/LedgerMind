@@ -83,7 +83,8 @@ fee); banked = inflows excluding large one-offs (the same rule `detect_cashflow_
 | `sales_total` | `float` | yes | Gross, as listed in the sales export |
 | `expected_banked_total` | `float` | yes | `sales_total` net of the policy's expected processor fee |
 | `banked_total` | `float` | yes | Inflows actually received, large one-offs excluded |
-| `reconciliation_ratio` | `float` | yes | `banked_total ÷ expected_banked_total`. 1.0 is a perfect match; the tool never divides by zero because the sales export is validated non-empty and every amount positive |
+| `reconciliation_ratio` | `float` | yes | **The median of the per-month ratios** of banked to expected. 1.0 is a perfect match. This is the decision figure, and the one a decline memo must cite. Robust to one-off exclusion distorting a minority of months — see FR-034 |
+| `period_ratio` | `float` | yes | `banked_total ÷ expected_banked_total`. Reported as evidence, not used for the decision. The tool never divides by zero because the sales export is validated non-empty with every amount positive |
 | `months_compared` | `int` | yes | Months in the union of both periods. Exists to satisfy FR-009/FR-019 |
 | `mismatched_month_count` | `int` | yes | Months whose own ratio is outside the per-month tolerance. Evidence, not a decision input |
 | `max_month_gap_pct` | `float` | yes | Largest single-month absolute deviation from a ratio of 1.0, as a percentage |
