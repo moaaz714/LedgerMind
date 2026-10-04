@@ -72,7 +72,25 @@ numeral-match candidates.
 
 An empty result is a count of zero, never an absent fact (spec edge case).
 
-### `score_risk(revenue_metrics, volatility, flags) -> dict`
+### `reconcile_sales(transactions, sales) -> dict`
+
+Compares what the sales export says should have been banked against what was banked (FR-034). Per
+calendar month over the union of both periods: expected banked = sales × (1 − expected processor
+fee); banked = inflows excluding large one-offs (the same rule `detect_cashflow_flags` applies).
+
+| Field | Type | Groundable | Notes |
+|---|---|---|---|
+| `sales_total` | `float` | yes | Gross, as listed in the sales export |
+| `expected_banked_total` | `float` | yes | `sales_total` net of the policy's expected processor fee |
+| `banked_total` | `float` | yes | Inflows actually received, large one-offs excluded |
+| `reconciliation_ratio` | `float` | yes | `banked_total ÷ expected_banked_total`. 1.0 is a perfect match; the tool never divides by zero because the sales export is validated non-empty and every amount positive |
+| `months_compared` | `int` | yes | Months in the union of both periods. Exists to satisfy FR-009/FR-019 |
+| `mismatched_month_count` | `int` | yes | Months whose own ratio is outside the per-month tolerance. Evidence, not a decision input |
+| `max_month_gap_pct` | `float` | yes | Largest single-month absolute deviation from a ratio of 1.0, as a percentage |
+| `reconciliation_tolerance_pct` | `float` | yes | The period-level tolerance that was applied, returned so a decline memo can cite it |
+| `reconciled` | `bool` | no | `True` when the period-level ratio is within tolerance, in both directions |
+
+### `score_risk(revenue_metrics, volatility, flags, reconciliation) -> dict`
 
 | Field | Type | Groundable | Notes |
 |---|---|---|---|
@@ -82,8 +100,11 @@ An empty result is a count of zero, never an absent fact (spec edge case).
 | `min_months_history` | `int` | yes | The history floor. `decline_reason` names both of these in prose, so a memo explaining either outcome can cite them |
 | `risk_tier` | `str \| None` | no | `"A"` \| `"B"` \| `"C"` \| `"D"`, or **None when declined** — a refused merchant has no tier, and inventing one would put a misleading grade in front of an analyst |
 | `declined` | `bool` | no | |
-| `decline_reason` | `str \| None` | no | Set only when `declined` |
+| `decline_reason` | `str \| None` | no | Set only when `declined`. Two causes: history below the minimum, checked first, or a period that does not reconcile (FR-035). A reconciliation decline names `reconciliation_ratio` and `reconciliation_tolerance_pct`, both already recorded as facts by `reconcile_sales` |
 | `drivers` | `list[str]` | no | Non-numeric reasons, for the memo to draw on |
+
+`reconciliation` is `reconcile_sales`'s full return. It decides whether to decline and adds **no**
+risk points, so the 40/25/25/10 weights are unchanged (FR-035).
 
 ### `compute_offer(revenue_metrics, risk) -> dict`
 
@@ -153,6 +174,9 @@ Written by `data/gen.py` at generation time to `truth.json`, beside the merchant
 | `true_bounced_payment_count` | `int` | |
 | `true_large_one_off_count` | `int` | |
 | `true_months_covered` | `int` | |
+| `true_total_sales` | `float` | Sum of the sales export as generated |
+| `true_reconciliation_ratio` | `float` | Realised banked ÷ expected banked, as built. A reconciling merchant sits at 1.0; a fixture sits deliberately away from it |
+| `true_reconciles` | `bool` | Whether the generator intended the merchant's records to agree |
 
 Importable **only** by `tests/` and `eval/` (Article III). Enforced by a test that walks the imports
 of `tools/`, `agent/`, `guardrail/`, and `app/` and fails if any of them reach truth — a structural

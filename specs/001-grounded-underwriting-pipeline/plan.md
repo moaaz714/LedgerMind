@@ -46,7 +46,7 @@ be produced live in front of a reviewer.
 **Constraints**: the model must fit within 6 GB of VRAM (RTX 2060). The agent's context must stay
 small, which FR-015 — tool outputs only, never raw transaction rows — also serves.
 
-**Scale/Scope**: 20 synthetic merchants, roughly 400 transactions each, 12–18 months of history.
+**Scale/Scope**: 22 synthetic merchants (20 across the four profiles plus two sales-reconciliation fixtures), roughly 400 transactions each, 12–18 months of history.
 
 ## Constitution Check
 
@@ -96,6 +96,7 @@ ledgermind/
 │   ├── revenue.py         # compute_revenue_metrics
 │   ├── volatility.py      # compute_volatility
 │   ├── flags.py           # detect_cashflow_flags
+│   ├── reconcile.py       # reconcile_sales (FR-034)
 │   ├── scoring.py         # score_risk
 │   ├── offer.py           # compute_offer
 │   └── registry.py        # name → (callable, schema). Single source for prompt + dispatcher.
@@ -134,7 +135,7 @@ a local working document — so this section is their only committed home.
 
 **Local Ollama rather than a hosted API.** Merchant financial data never leaves the device, which is
 the right default for the domain even with synthetic data. It is also free and unlimited, so the
-evaluation can run 20 merchants × 3 repetitions as often as needed; a metered API would create
+evaluation can run 22 merchants × 3 repetitions as often as needed; a metered API would create
 pressure to measure less, exactly where measurement is the point.
 
 **Qwen 2.5 7B rather than 14B.** 7B fits entirely within the available 6 GB of VRAM and runs fast.
@@ -166,6 +167,27 @@ pipeline.
 on. More importantly, a rule-based tier can be explained to a credit committee line by line, which
 is the actual product requirement — an unexplainable risk score would fail the use case even if it
 were more accurate.
+
+**Sales reconciliation as a decline condition, not a score component (amendment).** The sales
+export was a required, validated input that no tool read. `reconcile_sales` closes that, and
+`score_risk` takes its result and declines a merchant whose period does not reconcile. It adds no
+risk points, for two reasons. Adding a fifth component would force re-weighting the 40/25/25/10
+split, which is the one judgement call the whole scoring rests on, and that split has a written
+rationale this change would have to rewrite. And unverifiable revenue is not a riskier version of
+the same merchant, it is an unknown one, so pricing it would put a number on something nobody has
+confirmed. The cost is that the check is binary: a merchant just inside the tolerance is scored as
+though fully verified. The tolerance is therefore a policy constant, visible and changeable in one
+place.
+
+*Compliance with Articles I and II (constitution, Governance).* Article I: the tool is pure,
+computes every figure it returns in code, and the model passes only the labels `"transactions"`
+and `"sales"`, never rows, so no figure originates with the model. Article II: every numeric
+return is registered by the dispatcher before the transcript sees it, so a memo citing the ratio
+or the tolerance resolves against the ledger like any other figure. A reconciliation decline
+carries a decline memo held to FR-033's standard. Article III: the generator keeps its own
+reconciliation arithmetic rather than importing the tool's, so agreement between them is evidence
+and not tautology, as with the trend fit. Article IV: tolerances and the expected processor fee
+live in `policy.py`, and the tool's tests pass before `registry.py` wires it in.
 
 **Where the fact ledger is written.** In the dispatcher, immediately after a tool returns, *before*
 the result is appended to the model's transcript. That ordering is the whole mechanism: the model

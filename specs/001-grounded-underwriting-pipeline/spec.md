@@ -24,6 +24,7 @@ An underwriting analyst selects a merchant whose bank transactions and sales rec
 2. **Given** that memo, **When** every numeral in it is checked against the recorded analysis results, **Then** all of them resolve to a recorded value at a permitted rounding precision.
 3. **Given** the presented offer, **When** each structured field is compared to the corresponding analysis result, **Then** the values are identical — not approximations of them.
 4. **Given** a merchant whose cashflow contains overdrafts, **When** the system analyses it, **Then** the memo references the overdraft count and that count matches the recorded analysis result.
+5. **Given** a merchant whose bank inflows do not reconcile with their sales records beyond the declared tolerance, **When** the system analyses it, **Then** the merchant is declined, and the decline memo cites the reconciliation ratio and the tolerance it was judged against, both of which match recorded analysis results.
 
 ---
 
@@ -90,6 +91,9 @@ An analyst watches the decision being made: which analyses ran, in what order, w
 - **Ambiguous resolution**: when two different recorded facts hold the same value, a matching numeral is considered resolved — the claim being verified is that the figure came from an analysis, not which one. Provenance display lists every matching fact.
 - **Retries exhausted**: covered by US2; the labelled deterministic fallback is the defined outcome.
 - **Partially generated merchant**: a stored merchant missing any of its three artifacts is incomplete, and is regenerated in full rather than used or silently half-loaded (FR-031).
+- **Sales and bank periods differ**: a month that has sales but no bank inflows, or inflows but no sales, is compared like any other month and shows as a full mismatch. Months are taken from the union of both periods, never silently trimmed to their overlap, because a merchant whose sales stop being banked must not look reconciled by having those months dropped.
+- **Large one-off inflow in the bank record**: an exceptional inflow (an asset sale, say) is not a sale and has no counterpart in the sales export. It is excluded from the banked side of the reconciliation, using the same large-one-off rule the cashflow flags apply, so a genuine merchant is not declined for having sold a van.
+- **Deposits that overshoot sales**: reconciliation is two-sided. Bank inflows materially above what the sales records imply are as unexplained as inflows materially below, and both fail it.
 
 ## Requirements *(mandatory)*
 
@@ -126,7 +130,9 @@ An analyst watches the decision being made: which analyses ran, in what order, w
 **Verification**
 
 - **FR-017**: Before any narrative is displayed, System MUST extract every numeral from it and attempt to resolve each one against the recorded facts for that run.
-- **FR-018**: A numeral resolves if it equals a recorded value rounded to any precision on this declared ladder: nearest 1, nearest 10, nearest 100, nearest 1000, or one decimal place. No tolerance beyond this ladder is permitted. *(Worked example: a recorded average monthly revenue of 47812.34 is matched by "47,812", "47,800", and "48,000"; it is not matched by "52,000" or "50,000".)*
+- **FR-018**: A numeral resolves if it equals a recorded value rounded to any precision on this declared ladder: nearest 1, nearest 10, nearest 100, nearest 1000, or one decimal place. A rung on the ladder applies only where the recorded value is **at least ten times that rung's unit**; coarser rungs do not apply. The recorded value itself always resolves. No tolerance beyond this is permitted. *(Worked example: a recorded average monthly revenue of 47812.34 is matched by "47,812", "47,800", and "48,000"; it is not matched by "52,000" or "50,000".)*
+
+  *(The magnitude condition was added after the ladder, read literally, was found to permit nonsense. Rounding a small value to a coarse rung collapses it: nearest-10 of a recorded overdraft count of 3 is **0**, and nearest-10 of a recorded repayment percentage of 13 is **10** — so "no overdrafts" resolved against a count of three, and "repaid at 10%" against a rate of thirteen. Both are material misstatements that passed. Requiring the value to be at least ten times the rung bounds the rounding error at 5% of the figure, which is what the ladder was intended to express: that a memo may round sensibly, not that it may round a number into a different number.)*
 - **FR-019**: All numerals are in scope, including counts and durations, not only currency amounts and percentages. Cardinal numbers written as words MUST also be resolved.
 - **FR-020**: A narrative containing any numeral that does not resolve MUST be rejected and MUST NOT be displayed.
 - **FR-021**: A narrative that cites none of the decision's figures MUST be rejected as incomplete. For an **approved** merchant, a displayed memo MUST reference at least the advance amount, the repayment percentage, and one revenue metric. For a **declined** merchant — which has neither an advance nor a repayment percentage — it MUST reference the decline reason and at least one metric that drove the decision. *(The original wording required the advance and repayment percentage unconditionally, which made every decline memo permanently unsatisfiable: the check would reject each attempt until the retry allowance ran out and the fallback fired. Surfaced while designing the risk policy.)*
@@ -158,6 +164,11 @@ An analyst watches the decision being made: which analyses ran, in what order, w
 
 - **FR-033**: A declined merchant MUST receive a written memo explaining the refusal, held to the same grounding standard as an approved one. A decision to refuse credit has to be defensible to a credit committee in the same way a decision to extend it does.
 
+**Sales reconciliation**
+
+- **FR-034**: System MUST compare the sales records against the bank transaction records, returning at minimum: total sales, the banked total expected from those sales after the declared payment-processor fee, the banked total actually received (excluding large one-off inflows), the ratio of actual to expected, the number of months compared, the number of months whose own ratio falls outside the declared per-month tolerance, the largest single-month deviation, whether the period reconciles, and the tolerance applied. The comparison MUST cover every month in the union of the two periods. The expected processor fee and every tolerance MUST be declared in the policy module (FR-010) and MUST NOT be restated in the analysis. *(Without this the sales export is a required, validated input that nothing reads: FR-001 asks for two files and the system would use one, and the independent view of revenue named in the Sales Record entity would never be consulted.)*
+- **FR-035**: A merchant whose period does not reconcile MUST be declined, with a decline reason that names the reconciliation ratio and the tolerance. The history check precedes it: a file too short to assess is declined for that reason first. Reconciliation MUST NOT contribute to the risk score, so the declared score weights are unchanged. *(Revenue that cannot be verified is not a riskier version of the same merchant, it is an unknown one, and assigning it risk points would price a number nobody has confirmed. Declining also keeps the 40/25/25/10 weights, and the explanation for them, intact.)*
+
 ### Key Entities
 
 - **Merchant**: a small business being underwritten. Carries an identity, a period of history, and a profile (healthy, volatile, declining, or thin-file).
@@ -165,6 +176,7 @@ An analyst watches the decision being made: which analyses ran, in what order, w
 - **Sales Record**: one sale in the merchant's sales export — date and amount; the independent view of revenue against which bank inflows can be compared.
 - **Ground Truth**: the correct answers for a generated merchant, recorded at generation time. Readable only by tests and the evaluation. Never reachable from the decision path.
 - **Revenue Metrics**: the monthly revenue series and the measures derived from it — average, growth, trend, months covered.
+- **Sales Reconciliation**: the comparison of banked inflows against the sales export — expected and actual banked totals, their ratio, per-month deviations, and whether the period reconciles within tolerance.
 - **Cashflow Flag**: one identified risk indicator — its kind, the records that evidence it, and its severity.
 - **Risk Assessment**: the assigned tier and the metric values that drove it.
 - **Offer**: advance amount, repayment percentage, expected duration, and the policy bounds that constrained them.
@@ -185,6 +197,7 @@ An analyst watches the decision being made: which analyses ran, in what order, w
 - **SC-006**: A memo containing a fabricated figure is rejected on 100% of attempts.
 - **SC-007**: Every fallback shown is labelled as a fallback; no fallback is ever shown unlabelled, and no unverified narrative is ever shown.
 - **SC-008**: An analyst receives a completed memo and offer within 90 seconds of requesting a decision, so a decision can be produced live in front of a reviewer.
+- **SC-009**: Every merchant generated with a deliberate sales/bank mismatch is declined for that reason, and no merchant generated with reconciling records is declined for it, across the full merchant set.
 
 SC-001 is stated first deliberately. SC-002 through SC-004 verify that the plumbing works; SC-001 can fail while all of them pass, which makes it the criterion that actually tests whether the lending logic is sane.
 
@@ -195,11 +208,11 @@ SC-001 is stated first deliberately. SC-002 through SC-004 verify that the plumb
 - Revenue is assessed at monthly granularity.
 - Each merchant has between 12 and 18 months of history, except those deliberately generated as thin-file cases.
 - One policy regime applies to all merchants; there are no per-merchant underwriting rules or overrides.
-- The merchant set for evaluation contains 20 merchants spanning four profiles: healthy, volatile, declining, and thin-file.
+- The merchant set for evaluation contains 22 merchants: twenty spanning four profiles (healthy, volatile, declining, and thin-file), plus two healthy-profile reconciliation fixtures whose sales records deliberately disagree with their bank inflows, one overstated and one understated. They are added rather than substituted for existing merchants so that every existing merchant's records, truth and expected outcome are unchanged.
 - Retrieval of underwriting policy text to support justifications is an explicit non-goal of this specification.
 - One analyst at a time; no concurrent use, no multi-user state, no authentication.
 - The decision is advisory. No funds move, and no downstream lending system is integrated.
-- Revenue means **net cash received into the bank account**. The sales export lists individual sales; those are batched into bank deposits with a payment-processor fee deducted, so gross sales exceed banked revenue slightly. Net is the right basis because repayment is taken from cash that actually arrives.
+- Revenue means **net cash received into the bank account**. The sales export lists individual sales; those are batched into bank deposits with a payment-processor fee deducted, so gross sales exceed banked revenue slightly. Net is the right basis because repayment is taken from cash that actually arrives. The expected processor fee is a declared policy rate; reconciliation judges the banked total against sales net of that rate, so a difference of the size the fee explains is not a mismatch.
 - Large one-off inflows are detected and reported but are **not** excluded from the revenue basis, so a
   merchant with an exceptional inflow may be sized against revenue that is not fully recurring. A
   deliberate simplification: excluding them would introduce a second revenue figure, and both the memo
