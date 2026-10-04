@@ -100,6 +100,12 @@ def reconcile_sales(transactions: list[dict], sales: list[dict]) -> dict:
         "expected_banked_total": round(expected_banked_total, 2),
         "banked_total": round(banked_total, 2),
         "reconciliation_ratio": round(ratio, 6),
+        # The same figure as a percentage. Returned because prose reaches for "banked 74%
+        # of what sales imply" rather than "a ratio of 0.74" -- and 0.74 is two decimal
+        # places, which is not a rung on the grounding ladder, so the readable phrasing had
+        # no groundable figure behind it until this existed. Same reason the scores return
+        # their scale (FR-009).
+        "reconciliation_ratio_pct": round(ratio * 100, 4),
         "period_ratio": round(banked_total / expected_banked_total, 6) if expected_banked_total else 0.0,
         "months_compared": len(months),
         "mismatched_month_count": mismatched,

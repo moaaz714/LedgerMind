@@ -257,6 +257,12 @@ GROUNDING_MIN_MAGNITUDE_MULTIPLE = 10
 
 MAX_REGENERATION_ATTEMPTS = 3
 
+# How many tool calls one run may make before the loop gives up. Six analyses exist, so this
+# leaves room for a model that calls one out of order, is told so, and retries -- without
+# letting a confused model spin forever. A run that exhausts this allowance has not
+# understood the task, and the deterministic fallback is the honest outcome.
+MAX_TOOL_CALLS = 14
+
 
 # --------------------------------------------------------------------------------------
 # Band lookups

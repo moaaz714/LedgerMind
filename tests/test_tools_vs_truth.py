@@ -200,7 +200,7 @@ def test_only_the_mismatch_fixtures_are_declined_for_reconciliation(merchants, r
             f"{merchant_id}: reconciled={reconciliation['reconciled']} but the generator "
             f"intended {intended} (ratio {reconciliation['reconciliation_ratio']:.4f})"
         )
-        declined_for_reconciliation = risk["declined"] and "reconciles" in (
+        declined_for_reconciliation = risk["declined"] and "sales records imply" in (
             risk["decline_reason"] or ""
         )
         assert declined_for_reconciliation is (not intended), merchant_id

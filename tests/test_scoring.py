@@ -196,6 +196,7 @@ def _reconciliation(reconciled=True, ratio=1.0):
         "expected_banked_total": 97_500.0,
         "banked_total": 97_500.0 * ratio,
         "reconciliation_ratio": ratio,
+        "reconciliation_ratio_pct": round(ratio * 100, 4),
         "period_ratio": ratio,
         "months_compared": 15,
         "mismatched_month_count": 0 if reconciled else 15,
@@ -209,7 +210,7 @@ def test_a_non_reconciling_merchant_is_declined():
     result = score_risk(_metrics(), _volatility(), _flags(), _reconciliation(reconciled=False, ratio=0.74))
     assert result["declined"] is True
     assert result["risk_tier"] is None
-    assert "reconciles to 0.74" in result["decline_reason"]
+    assert "74.0%" in result["decline_reason"]
     assert f"{policy.RECONCILIATION_TOLERANCE_PCT:.1f}%" in result["decline_reason"]
 
 

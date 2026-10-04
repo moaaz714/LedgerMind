@@ -39,6 +39,11 @@ class Tool:
     # `compute_revenue_metrics.avg_monthly_revenue`. Lives here so the namespace and the
     # tool it belongs to cannot drift apart (data-model.md).
     namespace: str
+    # The name this tool's result is stored under for later tools to consume. Parameter
+    # names refer to these bindings, so the two together describe the dependency graph --
+    # and a test asserts every parameter is either a loaded input or some tool's binding,
+    # which is how an unsatisfiable tool set fails at import rather than mid-run.
+    binding: str
     description: str
     function: Callable[..., dict]
     parameters: dict[str, Any]
@@ -63,6 +68,7 @@ _TRANSACTIONS_PARAM = {
 TOOLS: tuple[Tool, ...] = (
     Tool(
         name="compute_revenue_metrics",
+        binding="revenue_metrics",
         namespace="revenue",
         description=(
             "Monthly banked revenue and the measures derived from it: average, total, "
@@ -84,6 +90,7 @@ TOOLS: tuple[Tool, ...] = (
     ),
     Tool(
         name="compute_volatility",
+        binding="volatility",
         namespace="volatility",
         description=(
             "Revenue stability, measured after removing the trend. Returns a coefficient "
@@ -105,6 +112,7 @@ TOOLS: tuple[Tool, ...] = (
     ),
     Tool(
         name="detect_cashflow_flags",
+        binding="flags",
         namespace="flags",
         description=(
             "Cashflow risk indicators: overdraft episodes, returned payments, whether the "
@@ -124,6 +132,7 @@ TOOLS: tuple[Tool, ...] = (
     ),
     Tool(
         name="reconcile_sales",
+        binding="reconciliation",
         namespace="reconcile",
         description=(
             "Check the sales export against the bank statement: whether the money the sales "
@@ -145,6 +154,7 @@ TOOLS: tuple[Tool, ...] = (
             "expected_banked_total",
             "banked_total",
             "reconciliation_ratio",
+            "reconciliation_ratio_pct",
             "period_ratio",
             "months_compared",
             "mismatched_month_count",
@@ -155,6 +165,7 @@ TOOLS: tuple[Tool, ...] = (
     ),
     Tool(
         name="score_risk",
+        binding="risk",
         namespace="risk",
         description=(
             "Assign a risk score and tier from the revenue, volatility, flag and "
@@ -184,6 +195,7 @@ TOOLS: tuple[Tool, ...] = (
     ),
     Tool(
         name="compute_offer",
+        binding="offer",
         namespace="offer",
         description=(
             "Compute the advance amount, repayment percentage, expected duration and total "
@@ -213,6 +225,14 @@ TOOLS: tuple[Tool, ...] = (
 )
 
 BY_NAME: dict[str, Tool] = {tool.name: tool for tool in TOOLS}
+
+# Inputs the dispatcher loads from the merchant's files. Everything else a tool asks for
+# must be some earlier tool's binding.
+LOADED_INPUTS = ("transactions", "sales")
+
+# `compute_volatility` takes the monthly series rather than the whole revenue result, so
+# that one field is bound separately. Declared here rather than special-cased in the loop.
+DERIVED_BINDINGS = {"monthly_revenue": ("revenue_metrics", "monthly_revenue")}
 
 
 def get(name: str) -> Tool:

@@ -121,9 +121,13 @@ def score_risk(
             "declined": True,
             # Names the ratio and the tolerance, both already recorded as facts by
             # reconcile_sales, so a decline memo can cite them and ground.
+            # One decimal place, and expressed as a percentage: the ratio itself is a
+            # small decimal that cannot be written at a permitted precision, so quoting it
+            # directly would make this reason ungroundable and no decline memo could cite
+            # it. Caught by test_loop when the first decline memo failed verification.
             "decline_reason": (
-                f"banked revenue reconciles to {reconciliation['reconciliation_ratio']:.2f} "
-                f"of the sales records, outside the tolerance of "
+                f"banked revenue is {reconciliation['reconciliation_ratio_pct']:.1f}% of "
+                f"what the sales records imply, outside the tolerance of "
                 f"{reconciliation['reconciliation_tolerance_pct']:.1f}%"
             ),
             "drivers": drivers,
