@@ -53,6 +53,7 @@ numeral-match candidates.
 | Field | Type | Groundable | Notes |
 |---|---|---|---|
 | `revenue_cv` | `float` | yes | **Detrended**: `revenue_stdev ÷ mean(monthly_revenue)`. See FR-005 |
+| `revenue_cv_pct` | `float` | yes | The same figure as a percentage. The first real model run produced "7.01%" for a recorded 0.0701 — honest arithmetic with no fact behind it — so the percentage prose reaches for has to be recorded (FR-009) |
 | `revenue_stdev` | `float` | yes | Standard deviation of the **residuals** after subtracting the trend line |
 | `stability_score` | `int` | yes | 0–100, derived from `revenue_cv` via `policy.py` bands |
 | `stability_score_max` | `int` | yes | The scale (100). Returned so prose may write "95 out of 100" — a bare denominator with no recorded value behind it is rejected as fabricated |

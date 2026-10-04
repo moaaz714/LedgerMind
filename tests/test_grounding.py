@@ -179,3 +179,32 @@ def test_hyphenated_non_cardinals_are_still_exempt():
     """The compound support must not undo the one-off fix."""
     assert _values("three large one-off inflows") == [3.0]
     assert _values("a one-off adjustment") == []
+
+
+# --- digits inside an identifier (found by the first real model run) -------------------
+
+
+def test_a_merchant_id_is_not_a_figure():
+    """The model opened its memo with "The business m02_healthy_mid has shown...".
+
+    The "02" was scanned as a numeric claim and passed only because that merchant's growth
+    rate happened to be 2.0. On m07, with no fact equal to 7, an honest memo naming the
+    merchant would have been rejected.
+    """
+    assert _values("The business m02_healthy_mid has shown steady growth") == []
+    assert _values("merchant m21_recon_overstated was declined") == []
+
+
+def test_a_figure_beside_an_identifier_is_still_read():
+    assert _values("m02_healthy_mid banked 57,100") == [57100.0]
+
+
+def test_a_trailing_letter_does_not_exempt_a_figure():
+    """Only the preceding character is checked. Excluding on a trailing letter too would
+    make "12m" invisible, and an unscanned numeral is a silent pass -- the direction that
+    costs the project its claim."""
+    assert _values("a 12m facility") == [12.0]
+
+
+def test_currency_and_percent_markers_still_work():
+    assert _values("$57,100 and 13%") == [57100.0, 13.0]

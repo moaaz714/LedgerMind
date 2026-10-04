@@ -99,12 +99,32 @@ def _dispatch(
     entries = ledger.register(tool.namespace, tool.name, result)
     _emit(observer, "registered", tool=name, keys=[entry.key for entry in entries])
 
-    messages.append({"role": "tool", "name": name, "content": _render(result)})
+    # The tool name goes inside the content as well as in the field, so the model can tell
+    # which result it is reading regardless of what the chat template does with extra keys.
+    messages.append({"role": "tool", "name": name, "content": f"{name} returned:\n{_render(result)}"})
     _emit(observer, "appended", tool=name, result=result)
     # --------------------------------------------------------------------------------
 
     bindings[tool.binding] = result
     return None
+
+
+def _display(value: Any) -> Any:
+    """A value at a precision the model may legally quote.
+
+    The fix for the single most common real failure. Shown `mom_growth_pct = 1.9886` the
+    model copies it as "1.99%", which the grounding ladder rejects because two decimal
+    places is not a rung -- so it was being handed a number it could not legally write, and
+    then rejected for writing it. Entirely the model doing the reasonable thing.
+
+    Rounding to one decimal place means whatever it copies is already a permitted rendering
+    of the recorded value. The ledger still holds full precision; this changes only what the
+    model is shown. Prompt instructions were tried first and did not work: the real run
+    produced "1.99%" twice in a row immediately after being told not to.
+    """
+    if isinstance(value, bool) or not isinstance(value, float):
+        return value
+    return round(value, policy.GROUNDING_DECIMAL_PLACES)
 
 
 def _render(result: dict) -> str:
@@ -116,11 +136,11 @@ def _render(result: dict) -> str:
     lines = []
     for key, value in result.items():
         if isinstance(value, list) and value and isinstance(value[0], (list, tuple)):
-            lines.extend(f"  {key}.{item[0]} = {item[1]}" for item in value)
+            lines.extend(f"  {key}.{item[0]} = {_display(item[1])}" for item in value)
         elif isinstance(value, list):
-            lines.append(f"  {key} = {value}")
+            lines.append(f"  {key} = {[_display(item) for item in value]}")
         else:
-            lines.append(f"  {key} = {value}")
+            lines.append(f"  {key} = {_display(value)}")
     return "\n".join(lines)
 
 
@@ -150,6 +170,21 @@ def run(
         completion = provider.chat(messages, tools=schemas)
         if not completion.wants_tools:
             break
+
+        # Record that the model asked, before recording what it got. Without this the
+        # transcript shows a tool result with no request behind it, and the model has no
+        # evidence its call ran -- so it calls again. On the first real run that produced
+        # four consecutive identical calls and about 78 seconds of wasted turns.
+        messages.append(
+            {
+                "role": "assistant",
+                "content": completion.text,
+                "tool_calls": [
+                    {"function": {"name": call.name, "arguments": call.arguments}}
+                    for call in completion.tool_calls
+                ],
+            }
+        )
 
         for call in completion.tool_calls:
             _emit(observer, "tool_call", tool=call.name)

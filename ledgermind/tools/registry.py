@@ -108,7 +108,14 @@ TOOLS: tuple[Tool, ...] = (
             },
             "required": ["monthly_revenue"],
         },
-        returns=("revenue_cv", "revenue_stdev", "stability_score", "stability_score_max", "insufficient_history"),
+        returns=(
+            "revenue_cv",
+            "revenue_cv_pct",
+            "revenue_stdev",
+            "stability_score",
+            "stability_score_max",
+            "insufficient_history",
+        ),
     ),
     Tool(
         name="detect_cashflow_flags",

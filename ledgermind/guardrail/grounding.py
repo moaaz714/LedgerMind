@@ -20,6 +20,13 @@ Three exemptions are applied, each narrow and each stated here rather than disco
    unlikely, and would simply need writing as "2,026".
 3. **Hyphenated non-cardinals.** "one-off" is not the number one. Hyphens are excluded from
    the word boundary, while genuine compounds ("twenty-one") are matched as a unit first.
+4. **Digits inside an identifier.** A numeral preceded by a letter or underscore is part of a
+   name, not a figure. The first real model run opened its memo with "The business
+   m02_healthy_mid has shown..." and the "02" was scanned as a claim -- it passed only
+   because that merchant's growth rate happened to be 2.0. On m07 an honest memo naming the
+   merchant would have been rejected. Only the *preceding* character is checked, so "12m"
+   is still read as twelve: excluding on a trailing letter too would create a silent pass,
+   which is the direction that costs the project its claim.
 
 Words of quantity that are not cardinals -- "no", "none", "several" -- are deliberately not
 treated as numerals. Including "no" would not catch the error it appears to: resolution is
@@ -42,6 +49,11 @@ ISO_DATE = re.compile(r"\b\d{4}-\d{2}(?:-\d{2})?\b")
 # quote the memo verbatim.
 NUMERAL = re.compile(
     r"""
+    (?<![A-Za-z_\d])                 # not the digits inside an identifier.
+                                     # A digit is excluded too, or "m02" would fail at the
+                                     # "0" and then match at the "2", whose predecessor is
+                                     # a digit rather than a letter. The match has to begin
+                                     # at a real number boundary.
     (?P<currency>[$£€]\s?)?          # optional currency marker
     (?P<number>
         \d{1,3}(?:,\d{3})+(?:\.\d+)? # 1,234 or 1,234.56
