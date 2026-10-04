@@ -160,10 +160,10 @@ labelled fallback appears.
 **Independent test**: Run the evaluation across all 22 merchants and confirm the report carries a
 figure for each of the five measures, each computed against recorded ground truth.
 
-- [ ] T031 [US3] Implement monotonicity in `ledgermind/eval/metrics.py` — for merchant pairs with equal revenue and differing volatility, assert the less stable merchant's advance is never larger (SC-001). Generate the paired fixtures via `ledgermind/data/gen.py`. This measure leads because it can fail while every other one passes, which makes it the one that tests the lending logic rather than the plumbing
-- [ ] T032 [US3] Add the remaining four measures to `ledgermind/eval/metrics.py` — grounding faithfulness as the proportion of displayed numerals resolving to a recorded fact (SC-002), policy-breach count (SC-003), run-to-run consistency over three runs of the same merchant asserting identical structured offer fields (SC-004), and tool-versus-truth agreement (SC-005)
-- [ ] T033 [US3] Implement `ledgermind/eval/harness.py` running the pipeline across all 22 merchants, collecting the five measures, and writing a report. Ground truth is read here and in `tests/` only (Article III)
-- [ ] T034 [US3] Add a CLI entry point for the harness and `tests/test_eval_harness.py` asserting the report contains every defined measure
+- [x] T031 [US3] Implement monotonicity in `ledgermind/eval/metrics.py` — for merchant pairs with equal revenue and differing volatility, assert the less stable merchant's advance is never larger (SC-001). Generate the paired fixtures via `ledgermind/data/gen.py`. This measure leads because it can fail while every other one passes, which makes it the one that tests the lending logic rather than the plumbing
+- [x] T032 [US3] Add the remaining four measures to `ledgermind/eval/metrics.py` — grounding faithfulness as the proportion of displayed numerals resolving to a recorded fact (SC-002), policy-breach count (SC-003), run-to-run consistency over three runs of the same merchant asserting identical structured offer fields (SC-004), and tool-versus-truth agreement (SC-005)
+- [x] T033 [US3] Implement `ledgermind/eval/harness.py` running the pipeline across all 22 merchants, collecting the five measures, and writing a report. Ground truth is read here and in `tests/` only (Article III)
+- [x] T034 [US3] Add a CLI entry point for the harness and `tests/test_eval_harness.py` asserting the report contains every defined measure
 
 **Checkpoint**: the claim is now a number anyone can re-run.
 

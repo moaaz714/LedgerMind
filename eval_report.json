@@ -1,0 +1,68 @@
+{
+  "provider": "ollama/qwen2.5",
+  "merchant_count": 22,
+  "elapsed_seconds": 546.5,
+  "passed": true,
+  "monotonicity_holds": true,
+  "monotonicity_pairs": [
+    {
+      "steady": "m02_healthy_mid",
+      "erratic": "m07_volatile_pairhigh",
+      "steady_advance": 77000.0,
+      "erratic_advance": 51300.0,
+      "holds": true
+    },
+    {
+      "steady": "m06_healthy_pairlow",
+      "erratic": "m10_volatile_pairhigh2",
+      "steady_advance": 93300.0,
+      "erratic_advance": 79500.0,
+      "holds": true
+    },
+    {
+      "steady": "m15_declining_pairlow",
+      "erratic": "m16_declining_pairhigh",
+      "steady_advance": 43800.0,
+      "erratic_advance": 34300.0,
+      "holds": true
+    }
+  ],
+  "grounding_faithfulness": 1.0,
+  "grounding_resolved": 159,
+  "grounding_total": 159,
+  "policy_breaches": [],
+  "truth_mismatches": [],
+  "reconciliation_errors": [],
+  "consistency_holds": true,
+  "attempts": {
+    "1": 22
+  },
+  "fallbacks": [],
+  "declines": [
+    {
+      "merchant": "m08_volatile_high",
+      "reason": "risk score 78 is at or above the decline threshold of 75"
+    },
+    {
+      "merchant": "m14_declining_distress",
+      "reason": "risk score 90 is at or above the decline threshold of 75"
+    },
+    {
+      "merchant": "m17_thin_4mo",
+      "reason": "history of 4 months is below the minimum of 6"
+    },
+    {
+      "merchant": "m18_thin_5mo",
+      "reason": "history of 5 months is below the minimum of 6"
+    },
+    {
+      "merchant": "m21_recon_overstated",
+      "reason": "banked revenue is 74.1% of what the sales records imply, outside the tolerance of 8.0%"
+    },
+    {
+      "merchant": "m22_recon_understated",
+      "reason": "banked revenue is 142.9% of what the sales records imply, outside the tolerance of 8.0%"
+    }
+  ],
+  "failures": []
+}
