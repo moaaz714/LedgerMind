@@ -292,3 +292,93 @@ def test_a_declined_merchant_reaches_a_verified_decline(merchant_root):
     assert decision.declined is True
     assert decision.verification.passed, decision.verification.reason()
     assert decision.offer["advance_amount"] == 0.0
+
+
+# --- rendering must never reach the decision path -------------------------------------
+
+
+def _boundary_merchant(growth_pct):
+    """A merchant growing at exactly `growth_pct` a month."""
+    months = [f"2026-{m:02d}" for m in range(1, 13)] + [f"2027-{m:02d}" for m in range(1, 4)]
+    rate = 1 + growth_pct / 100
+    transactions, balance = [], 100_000.0
+    for i, month in enumerate(months):
+        amount = round(50_000 * rate**i, 2)
+        balance = round(balance + amount, 2)
+        transactions.append(
+            {"date": f"{month}-10", "amount": amount, "description": "card settlement", "balance": balance}
+        )
+    sales = [
+        {"date": f"{m}-05", "amount": round(50_000 * rate**i / 0.975, 2)}
+        for i, m in enumerate(months)
+    ]
+    return {"merchant_id": "boundary_probe", "transactions": transactions, "sales": sales}
+
+
+def _memo_for(merchant):
+    """A memo built from the merchant's own figures, so it verifies.
+
+    Composed from the tool results rather than hand-written, because these tests are about
+    where precision flows -- a memo that failed verification would send the loop into
+    retries and obscure what is being measured.
+    """
+    from ledgermind.tools.flags import detect_cashflow_flags
+    from ledgermind.tools.offer import compute_offer
+    from ledgermind.tools.reconcile import reconcile_sales
+    from ledgermind.tools.revenue import compute_revenue_metrics
+    from ledgermind.tools.scoring import score_risk
+    from ledgermind.tools.volatility import compute_volatility
+
+    tx, sl = merchant["transactions"], merchant["sales"]
+    metrics = compute_revenue_metrics(tx)
+    risk = score_risk(metrics, compute_volatility(metrics["monthly_revenue"]),
+                      detect_cashflow_flags(tx), reconcile_sales(tx, sl))
+    offer = compute_offer(metrics, risk)
+    return (
+        f"Revenue averaged {metrics['avg_monthly_revenue']:,.2f} a month over "
+        f"{metrics['months_covered']} months. We can advance "
+        f"{offer['advance_amount']:,.2f} at {offer['repayment_pct']:.1f}% over "
+        f"{offer['expected_duration_months']} months."
+    )
+
+
+def test_scoring_uses_the_recorded_value_not_the_rendered_one():
+    """The invariant that keeps a display change out of the decision.
+
+    Tool results are rendered to one decimal place before the model sees them, so a figure
+    it copies is always a permitted rendering. That rounding must never reach the analyses:
+    a merchant growing at 2.04% a month is above the trend boundary of 2.0 and earns zero
+    trend points, while the rendered 2.0 is at the boundary and would earn ten. A refactor
+    that passed the rendered values into the tools would silently reprice this merchant.
+    """
+    merchant = _boundary_merchant(2.04)
+    decision = loop.run(merchant, FakeProvider(_tools_then(_memo_for(merchant))))
+
+    real = decision.revenue_metrics["mom_growth_pct"]
+    assert real == pytest.approx(2.04, abs=1e-6), "fixture must sit just above the boundary"
+    assert real > policy.TREND_RISING_PCT
+
+    assert decision.revenue_metrics["trend"] == "rising"
+    assert policy.trend_risk_points(real) == 0
+    assert policy.trend_risk_points(round(real, policy.GROUNDING_DECIMAL_PLACES)) == 10, (
+        "the rendered value lands on the other side of the band, which is what makes this "
+        "test meaningful"
+    )
+
+    volatility_points = policy.volatility_band(decision.volatility["revenue_cv"])[1]
+    history_points = policy.history_risk_points(decision.revenue_metrics["months_covered"])
+    assert decision.risk["risk_score"] == volatility_points + history_points, (
+        "the score must contain no trend points, which is only true of the real value"
+    )
+
+
+def test_the_full_precision_value_reaches_the_analyst():
+    """Rounding happens on exactly one path: what the model is shown.
+
+    The Decision carries every tool result whole, so the interface renders full precision
+    even where the memo says something rounded.
+    """
+    merchant = _boundary_merchant(2.04)
+    decision = loop.run(merchant, FakeProvider(_tools_then(_memo_for(merchant))))
+    assert decision.revenue_metrics["mom_growth_pct"] == pytest.approx(2.04, abs=1e-6)
+    assert decision.revenue_metrics["mom_growth_pct"] != round(2.04, 1)
