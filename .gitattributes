@@ -1,0 +1,3 @@
+
+# Keep the README as UTF-8. It was once committed as UTF-16, which GitHub does not render.
+*.md text eol=lf working-tree-encoding=UTF-8
