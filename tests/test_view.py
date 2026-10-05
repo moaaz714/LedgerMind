@@ -195,3 +195,44 @@ def test_formatting_never_rounds():
     assert view.format_value(1.9886) == "1.9886"
     assert view.format_value(0.070063) == "0.070063"
     assert "1.99" != view.format_value(1.9886)
+
+
+# --- the app has to run the way the README says to run it -----------------------------
+
+
+def test_the_app_module_executes_as_a_script(tmp_path):
+    """`streamlit run path/to/app.py` puts the SCRIPT's directory on sys.path, not the
+    working directory -- so an uninstalled package at the repository root is not importable
+    and every import in the app fails with ModuleNotFoundError.
+
+    This went unnoticed because booting the server is not the same as rendering the page:
+    the app body only executes when a session connects, so a headless boot reported success
+    while the page was broken. Running the file as a bare script reproduces the same
+    sys.path condition and executes the body, which is the check that was missing.
+
+    Run from a temporary directory, because running it from the repository root would put
+    the root on sys.path and hide the very thing being tested.
+    """
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    app = Path("ledgermind/app/streamlit_app.py").resolve()
+    result = subprocess.run(
+        [sys.executable, str(app)],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=180,
+    )
+    combined = result.stdout + result.stderr
+    assert "ModuleNotFoundError" not in combined, combined[-800:]
+    assert result.returncode == 0, combined[-800:]
+
+
+def test_the_app_uses_no_removed_streamlit_arguments():
+    """`use_container_width` was removed after 2025-12-31, which has passed."""
+    from pathlib import Path
+
+    source = Path("ledgermind/app/streamlit_app.py").read_text(encoding="utf-8")
+    assert "use_container_width" not in source

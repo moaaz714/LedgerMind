@@ -14,7 +14,20 @@ analysis that produced it and the full-precision value behind what was written.
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
+
+# `streamlit run path/to/app.py` puts the SCRIPT's directory on sys.path, not the working
+# directory the way `python -m` does -- so `ledgermind` is not importable and every import
+# below fails with ModuleNotFoundError. Adding the repository root fixes it for any launch
+# method, which is the point: a reader following the README should not have to know this.
+#
+# The alternative is making the package installable, which plan.md declined on the grounds
+# that LedgerMind is run from the repository root and never distributed. That reasoning
+# still holds; this is the three lines it costs.
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 import pandas as pd
 import streamlit as st
@@ -61,7 +74,7 @@ if not available:
 
 merchant_id = st.sidebar.selectbox("Merchant", available)
 model = st.sidebar.text_input("Ollama model", value="qwen2.5")
-run_clicked = st.sidebar.button("Underwrite", type="primary", use_container_width=True)
+run_clicked = st.sidebar.button("Underwrite", type="primary", width="stretch")
 
 st.sidebar.divider()
 st.sidebar.caption(
@@ -161,7 +174,7 @@ else:
                         for r in rows
                     ]
                 ),
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
             st.caption(
@@ -188,7 +201,7 @@ else:
                             for r in section["rows"]
                         ]
                     ),
-                    use_container_width=True,
+                    width="stretch",
                     hide_index=True,
                 )
 
@@ -201,7 +214,7 @@ else:
             pd.DataFrame(
                 [{"fact": k, "value": view.format_value(v)} for k, v in decision.facts.items()]
             ),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
             height=320,
         )
@@ -248,7 +261,7 @@ else:
                     for p in report["monotonicity_pairs"]
                 ]
             ),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -261,7 +274,7 @@ else:
     if report["declines"]:
         with st.expander(f"Declined — {len(report['declines'])} merchants"):
             st.dataframe(
-                pd.DataFrame(report["declines"]), use_container_width=True, hide_index=True
+                pd.DataFrame(report["declines"]), width="stretch", hide_index=True
             )
 
     st.success("ALL CRITERIA PASS") if report["passed"] else st.error("Criteria failed")
