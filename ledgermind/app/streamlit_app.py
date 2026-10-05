@@ -277,4 +277,10 @@ else:
                 pd.DataFrame(report["declines"]), width="stretch", hide_index=True
             )
 
-    st.success("ALL CRITERIA PASS") if report["passed"] else st.error("Criteria failed")
+    # A statement, not a conditional expression. Written as an expression, Streamlit's
+    # magic treats the bare value as something to display and renders the DeltaGenerator
+    # the call returned -- its repr, followed by a table of all its members.
+    if report["passed"]:
+        st.success("ALL CRITERIA PASS")
+    else:
+        st.error("Criteria failed")

@@ -236,3 +236,31 @@ def test_the_app_uses_no_removed_streamlit_arguments():
 
     source = Path("ledgermind/app/streamlit_app.py").read_text(encoding="utf-8")
     assert "use_container_width" not in source
+
+
+def test_the_app_has_no_bare_expressions_for_streamlit_magic_to_render():
+    """Streamlit auto-displays a bare value on its own line via st.write.
+
+    A conditional expression used as a statement -- st.success(...) if cond else
+    st.error(...) -- is a bare value, so Streamlit rendered the DeltaGenerator the call
+    returned: its repr, followed by a table of every method on it, in the middle of the
+    page. The fix is an if-statement, and the general rule is that nothing in this module
+    may be a bare non-call expression.
+
+    Walks the whole tree rather than the module body, because magic applies to nested
+    blocks too and the offending line was inside an else-branch.
+    """
+    import ast
+    from pathlib import Path
+
+    source = Path("ledgermind/app/streamlit_app.py").read_text(encoding="utf-8")
+    offenders = []
+    for node in ast.walk(ast.parse(source)):
+        if not isinstance(node, ast.Expr):
+            continue
+        if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+            continue  # a docstring
+        if isinstance(node.value, ast.Call):
+            continue  # a real Streamlit command
+        offenders.append((node.lineno, type(node.value).__name__))
+    assert not offenders, f"bare expressions Streamlit would render: {offenders}"
