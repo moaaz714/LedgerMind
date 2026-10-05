@@ -382,3 +382,38 @@ def test_the_full_precision_value_reaches_the_analyst():
     decision = loop.run(merchant, FakeProvider(_tools_then(_memo_for(merchant))))
     assert decision.revenue_metrics["mom_growth_pct"] == pytest.approx(2.04, abs=1e-6)
     assert decision.revenue_metrics["mom_growth_pct"] != round(2.04, 1)
+
+
+# --- FR-013: the record stays inspectable after the run -------------------------------
+
+
+def test_the_decision_carries_every_recorded_fact(merchant, honest_memo):
+    """FR-013. Provenance gives a key; this is what lets a consumer reach the value.
+
+    Without it an interface could show "you wrote 2.0%" and nothing else -- not the 1.9886
+    behind it, which is the entire point of displaying provenance.
+    """
+    decision = loop.run(merchant, FakeProvider(_tools_then(honest_memo)))
+
+    assert decision.facts, "the decision must carry the recorded facts"
+    for entry in decision.provenance:
+        for key in entry.fact_keys:
+            assert key in decision.facts, key
+            assert decision.recorded_value(key) is not None
+
+
+def test_a_rounded_quotation_resolves_to_its_full_precision_value(merchant, honest_memo):
+    decision = loop.run(merchant, FakeProvider(_tools_then(honest_memo)))
+    recorded = decision.recorded_value("revenue.mom_growth_pct")
+    assert recorded == decision.revenue_metrics["mom_growth_pct"]
+    assert recorded != round(recorded, policy.GROUNDING_DECIMAL_PLACES), (
+        "this merchant's growth rate must carry more precision than the memo can show, "
+        "or the test proves nothing"
+    )
+
+
+def test_the_fallback_decision_also_carries_the_facts(merchant, honest_memo):
+    bad = honest_memo.replace("77,000", "999,999")
+    decision = loop.run(merchant, FakeProvider(_tools_then(bad) + [Completion(text=bad)] * 10))
+    assert decision.used_fallback is True
+    assert decision.facts

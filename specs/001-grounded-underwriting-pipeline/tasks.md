@@ -52,6 +52,10 @@ smuggled in; reconcile with `/speckit-converge`.
 - **`ledgermind/agent/ledger.py`** (T021) — the plan put the fact ledger inside `loop.py`. Split
   out so it can be tested without importing the loop, and so the loop stays the ~150 lines it is
   meant to be.
+- **`ledgermind/tools/reconcile.py`** (T044) — arrived with Amendment A, which postdates the plan.
+- **`ledgermind/decide.py`** (T039) — a single-merchant CLI. The plan assumed the Streamlit
+  interface would be how a reader runs the pipeline; with US4 dropped, the README needed something
+  it could tell someone to type, or the evaluation has to be taken on trust.
 
 ---
 
@@ -160,16 +164,24 @@ labelled fallback appears.
 **Independent test**: Run the evaluation across all 22 merchants and confirm the report carries a
 figure for each of the five measures, each computed against recorded ground truth.
 
-- [ ] T031 [US3] Implement monotonicity in `ledgermind/eval/metrics.py` — for merchant pairs with equal revenue and differing volatility, assert the less stable merchant's advance is never larger (SC-001). Generate the paired fixtures via `ledgermind/data/gen.py`. This measure leads because it can fail while every other one passes, which makes it the one that tests the lending logic rather than the plumbing
-- [ ] T032 [US3] Add the remaining four measures to `ledgermind/eval/metrics.py` — grounding faithfulness as the proportion of displayed numerals resolving to a recorded fact (SC-002), policy-breach count (SC-003), run-to-run consistency over three runs of the same merchant asserting identical structured offer fields (SC-004), and tool-versus-truth agreement (SC-005)
-- [ ] T033 [US3] Implement `ledgermind/eval/harness.py` running the pipeline across all 22 merchants, collecting the five measures, and writing a report. Ground truth is read here and in `tests/` only (Article III)
-- [ ] T034 [US3] Add a CLI entry point for the harness and `tests/test_eval_harness.py` asserting the report contains every defined measure
+- [x] T031 [US3] Implement monotonicity in `ledgermind/eval/metrics.py` — for merchant pairs with equal revenue and differing volatility, assert the less stable merchant's advance is never larger (SC-001). Generate the paired fixtures via `ledgermind/data/gen.py`. This measure leads because it can fail while every other one passes, which makes it the one that tests the lending logic rather than the plumbing
+- [x] T032 [US3] Add the remaining four measures to `ledgermind/eval/metrics.py` — grounding faithfulness as the proportion of displayed numerals resolving to a recorded fact (SC-002), policy-breach count (SC-003), run-to-run consistency over three runs of the same merchant asserting identical structured offer fields (SC-004), and tool-versus-truth agreement (SC-005)
+- [x] T033 [US3] Implement `ledgermind/eval/harness.py` running the pipeline across all 22 merchants, collecting the five measures, and writing a report. Ground truth is read here and in `tests/` only (Article III)
+- [x] T034 [US3] Add a CLI entry point for the harness and `tests/test_eval_harness.py` asserting the report contains every defined measure
 
 **Checkpoint**: the claim is now a number anyone can re-run.
 
 ---
 
 ## Phase 6: User Story 4 — Inspect a run in the interface (Priority: P4)
+
+> **DROPPED, deliberately.** Cut for time, which this specification anticipated: US4 is named the
+> first candidate to cut, and its absence is stated to cost polish rather than the central claim.
+> FR-029 and FR-030 are satisfied instead by `ledgermind/decide.py`, which displays the memo, the
+> structured offer and the provenance of every figure in it, and computes nothing. What is unmet
+> is the interaction — analyses streaming as they run, and selecting a figure to see its source.
+> The observer hook in the agent loop exists for exactly that, so the remaining work is a UI layer
+> over an interface that is already in place.
 
 **Goal**: Grounding becomes visible rather than merely claimed.
 
@@ -187,9 +199,9 @@ analyses ran, what each returned, and which analysis produced any given figure i
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T039 Write `README.md` covering setup, how to generate merchants, how to run the pipeline, and how to run the evaluation — absorbing the `quickstart.md` content deliberately deferred in plan.md
-- [ ] T040 Run `/speckit-converge` and reconcile this file against what was actually built, appending any remaining work as new tasks
-- [ ] T041 Run the constitution's demonstration gate — full test suite green and the eval harness reporting grounding faithfulness and policy compliance over all 22 merchants
+- [x] T039 Write `README.md` covering setup, how to generate merchants, how to run the pipeline, and how to run the evaluation — absorbing the `quickstart.md` content deliberately deferred in plan.md
+- [x] T040 Run `/speckit-converge` and reconcile this file against what was actually built, appending any remaining work as new tasks
+- [x] T041 Run the constitution's demonstration gate — full test suite green and the eval harness reporting grounding faithfulness and policy compliance over all 22 merchants
 
 ---
 
@@ -262,3 +274,28 @@ checkpoint.
 - Every bound lives in `ledgermind/policy.py`; an inline literal governing a decision is a defect
 - Scope discipline: work may be dropped from the end of Phase 6 onward, never from the grounding or
   verification core (constitution, Development Workflow)
+
+---
+
+## Phase 8: Convergence
+
+Appended by `/speckit-converge` after Day 1, Day 2, Amendment A and the evaluation harness.
+537 tests passing; the evaluation reports ALL CRITERIA PASS over 22 merchants. No constitution
+violations: Article I was verified structurally (scoring uses recorded values, not the rounded
+ones shown to the model), Article II holds at every consumer, Article III is enforced by a test,
+and Article IV holds across the tools.
+
+Of the six requirements with no reference by name in the code, five are implemented and merely
+uncited — the period facts (FR-003), the single policy module (FR-010), the ledger entry shape
+(FR-011), model-driven tool choice (FR-014) and the separation of ground truth (FR-027). Only
+one was a real gap.
+
+- [x] T048 Carry a ledger snapshot on `Decision` so a recorded figure can be resolved from a provenance key, per FR-013 (partial). `Provenance` holds fact keys and `Decision` holds the five tool results, but nothing maps a key to its recorded value — so "you wrote 2.0%, the record says 1.9886" cannot be shown. Add the snapshot and a test asserting every provenance key resolves within it
+- [x] T049 State the warm and cold timings separately in spec.md's SC-008, per SC-008 (partial). A decision takes 15-25s warm, inside the 90-second budget, but a cold model load costs about 73 seconds and a first run after boot exceeds it. The criterion is met in the condition that matters for a live demonstration and unmet in the other; saying which is honest, and a reader cannot otherwise tell whether 90 seconds was achieved
+- [x] T050 Record `ledgermind/tools/reconcile.py` and `ledgermind/decide.py` in the Known-deviation section, per plan.md's module tree (unrequested). reconcile.py arrived with Amendment A; decide.py is a single-merchant CLI added so the README can tell a reader how to run the pipeline, the Streamlit interface having been cut. Five deviations total, all deliberate, none yet reflected in plan.md itself
+- [x] T051 Record the US4 scope decision in spec.md and plan.md, per US4/AC1-3 (missing). The interface is deliberately dropped for time, which the spec itself anticipated: US4 is named the first candidate to cut and its absence is stated to cost polish rather than the central claim. FR-029 and FR-030 are satisfied by `decide.py`, which displays the memo, the structured offer and per-figure provenance; what is unmet is the streaming and select-a-figure interaction. Mark it dropped rather than leaving it to read as unbuilt work
+- [x] T052 Run the constitution's demonstration gate, per T041 (missing). Full suite green plus the evaluation reporting grounding faithfulness and policy compliance over the full merchant set
+
+**Checkpoint — Phase 8**: FR-013 satisfied, the scope decisions and deviations recorded in the
+artifacts rather than only in conversation, and the demonstration gate passed.
+

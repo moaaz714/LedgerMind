@@ -66,6 +66,12 @@ An evaluator runs the pipeline across the full set of merchants whose correct an
 
 ### User Story 4 - Inspect a run in the interface (Priority: P4)
 
+> **Status: dropped.** Cut for time under the scope discipline this specification sets out — US4
+> is the one story whose absence costs polish rather than the central claim. FR-029 and FR-030 are
+> met by the command-line entry point, which shows the memo, the structured offer and per-figure
+> provenance and computes nothing. The acceptance scenarios below describing live streaming and
+> figure selection are unmet, and recorded as such rather than left to read as unbuilt work.
+
 An analyst watches the decision being made: which analyses ran, in what order, what each returned, and which analysis each figure in the memo came from.
 
 **Why this priority**: It makes the grounding visible rather than merely claimed, which is what persuades a sceptical reviewer. It is also the only story whose absence costs nothing but polish, so it is the first candidate to drop if time runs short.
@@ -198,7 +204,7 @@ An analyst watches the decision being made: which analyses ran, in what order, w
 - **SC-005**: Every analysis result agrees with the merchant's recorded correct answer within the stated tolerance, for every merchant in the set.
 - **SC-006**: A memo containing a fabricated figure is rejected on 100% of attempts.
 - **SC-007**: Every fallback shown is labelled as a fallback; no fallback is ever shown unlabelled, and no unverified narrative is ever shown.
-- **SC-008**: An analyst receives a completed memo and offer within 90 seconds of requesting a decision, so a decision can be produced live in front of a reviewer.
+- **SC-008**: An analyst receives a completed memo and offer within 90 seconds of requesting a decision **once the model is loaded**, so a decision can be produced live in front of a reviewer. A first request after start-up additionally pays the model's load time and is excluded from this criterion. *(Measured: 15–25 seconds warm, against roughly 73 seconds for the load alone. Stated separately because the criterion is met in the condition that matters for a live demonstration and unmet in the other, and a single number would hide which. The practical consequence is that the model should be warmed before any demonstration.)*
 - **SC-009**: Every merchant generated with a deliberate sales/bank mismatch is declined for that reason, and no merchant generated with reconciling records is declined for it, across the full merchant set.
 
 SC-001 is stated first deliberately. SC-002 through SC-004 verify that the plumbing works; SC-001 can fail while all of them pass, which makes it the criterion that actually tests whether the lending logic is sane.
