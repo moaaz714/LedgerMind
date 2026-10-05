@@ -1,7 +1,7 @@
 {
   "provider": "ollama/qwen2.5",
   "merchant_count": 22,
-  "elapsed_seconds": 546.5,
+  "elapsed_seconds": 496.3,
   "passed": true,
   "monotonicity_holds": true,
   "monotonicity_pairs": [

@@ -287,4 +287,5 @@ def _verify_with_retries(
         provenance=provenance,
         tool_calls=tuple(called),
         provider_name=provider.name,
+        facts=ledger.snapshot(),
     )

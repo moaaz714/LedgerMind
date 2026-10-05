@@ -121,6 +121,16 @@ ledgermind/
 tests/
 ```
 
+**Five modules exist that the tree above does not name**, each a deliberate and recorded
+deviation: `data/load.py` (the plan names the module that writes merchant data but not the one
+that reads it, which FR-001 and FR-002 require), `tools/trend.py` (shared by the revenue and
+volatility tools so they cannot disagree about where the trend line sits), `agent/ledger.py`
+(split out of `loop.py` so it tests without importing the loop), `tools/reconcile.py` (Amendment
+A, which postdates this plan), and `decide.py` (a CLI, needed once US4 was dropped). They are
+listed together in tasks.md.
+
+**`app/streamlit_app.py` was never built.** US4 is dropped; see the note on that story in spec.md.
+
 **Structure Decision**: one package at the repository root with `tests/` alongside it. The
 template's web-application and mobile layouts were deleted as inapplicable — there is no network
 service and no client/server split. The package boundaries are drawn to match the constitution

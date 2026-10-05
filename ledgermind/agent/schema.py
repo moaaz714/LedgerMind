@@ -79,6 +79,13 @@ class Decision:
     tool_calls: tuple[str, ...] = ()
     provider_name: str = ""
 
+    # Every recorded fact, keyed as the provenance refers to them (FR-013: the record must
+    # remain inspectable after the run). Without it `Provenance` gives a consumer the key
+    # `revenue.mom_growth_pct` and no way to reach the 1.9886 behind it -- so an interface
+    # could not show "you wrote 2.0%, the recorded value is 1.9886", which is the whole
+    # point of displaying provenance at all.
+    facts: dict[str, Any] = field(default_factory=dict)
+
     @property
     def declined(self) -> bool:
         return bool(self.offer.get("declined"))
@@ -91,3 +98,11 @@ class Decision:
         without telling the analyst (FR-025).
         """
         return self.verification.used_fallback
+
+    def recorded_value(self, fact_key: str) -> Any:
+        """The value behind a provenance key, at full precision.
+
+        What the memo quotes is rounded to a renderable precision; this is what was
+        actually computed.
+        """
+        return self.facts.get(fact_key)
