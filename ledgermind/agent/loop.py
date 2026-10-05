@@ -20,6 +20,7 @@ model mistake into a failed run.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any, Callable
 
 from ledgermind import policy
@@ -240,6 +241,7 @@ def _verify_with_retries(
     offer, risk = bindings["offer"], bindings["risk"]
     verification: VerificationResult | None = None
     provenance: tuple = ()
+    rejected: tuple[str, ...] = ()
 
     for attempt in range(1, policy.MAX_REGENERATION_ATTEMPTS + 1):
         verification, provenance = check_output(memo, ledger, offer, risk, attempt=attempt)
@@ -247,6 +249,8 @@ def _verify_with_retries(
               reason=verification.reason())
         if verification.passed:
             break
+        # Remember what the model got wrong, so the fallback can report it.
+        rejected = verification.unresolved_numerals or verification.missing_citations
         if attempt == policy.MAX_REGENERATION_ATTEMPTS:
             break
 
@@ -266,6 +270,7 @@ def _verify_with_retries(
             memo, ledger, offer, risk,
             attempt=policy.MAX_REGENERATION_ATTEMPTS, used_fallback=True,
         )
+        verification = replace(verification, rejected_numerals=tuple(rejected))
         _emit(observer, "fallback", passed=verification.passed)
         if not verification.passed:
             # The safe path must always be available. Reaching here means the fallback

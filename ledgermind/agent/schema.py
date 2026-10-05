@@ -30,6 +30,12 @@ class VerificationResult:
     attempt: int = 1
     used_fallback: bool = False
 
+    # The figures the model got wrong, carried through to the fallback result.
+    # `unresolved_numerals` on a fallback describes the fallback, which passes by
+    # construction -- so without this the interface could report that verification failed
+    # and not what failed, which is the one thing a reader actually wants to know.
+    rejected_numerals: tuple[str, ...] = ()
+
     def reason(self) -> str:
         """A single line explaining the failure, for the regeneration prompt."""
         parts = []

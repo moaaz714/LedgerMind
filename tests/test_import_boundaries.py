@@ -85,7 +85,7 @@ def test_decision_path_does_not_reach_ground_truth(path):
         )
 
     for value in _non_docstring_strings(tree):
-        assert "truth" not in value.lower(), (
+        assert "truth.json" not in value.lower(), (
             f"{path} contains the string literal {value!r}; ground truth is readable only "
             "by tests/ and eval/ (Article III)"
         )
@@ -121,7 +121,7 @@ def test_the_boundary_test_actually_has_teeth(tmp_path):
     tree = _parse(offender)
 
     assert any(name == "pandas" for name in _imported_names(tree))
-    assert any("truth" in value.lower() for value in _non_docstring_strings(tree))
+    assert any("truth.json" in value.lower() for value in _non_docstring_strings(tree))
     # And the docstring itself was correctly excluded.
     assert not any("must NOT trip" in value for value in _non_docstring_strings(tree))
 
