@@ -45,6 +45,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 from ledgermind import policy
+from ledgermind.data import load
 
 # --------------------------------------------------------------------------------------
 # Generation constants.
@@ -88,7 +89,9 @@ MONTH_FLOOR_FRACTION = 0.02
 BOUNCED_PAYMENT_REVENUE_FRACTION = 0.04
 PERIOD_END = date(2026, 9, 30)
 
-DATA_ROOT = Path("data/merchants")
+# One definition, declared in load.py so the interface can find merchants without
+# importing this module.
+DATA_ROOT = load.DEFAULT_ROOT
 TRUTH_FILENAME = "truth.json"
 REQUIRED_FILES = ("transactions.csv", "sales.csv", TRUTH_FILENAME)
 

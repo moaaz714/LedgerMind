@@ -19,6 +19,13 @@ import csv
 from datetime import date
 from pathlib import Path
 
+# Where generated merchants live by default. Declared on the read side so a consumer can
+# find merchants without importing the generator -- the decision path must not depend on
+# generation code, which is where ground truth is written (Article III).
+DEFAULT_ROOT = Path("data/merchants")
+
+INPUT_FILES = ("transactions.csv", "sales.csv")
+
 TRANSACTION_COLUMNS = ("date", "amount", "description", "balance")
 SALES_COLUMNS = ("date", "amount")
 
@@ -75,6 +82,24 @@ def _read(path: Path, required: tuple[str, ...]) -> tuple[list[dict[str, str]], 
     if not rows:
         raise InputError(f"{path.name} contains a header but no records")
     return rows, list(reader.fieldnames or ())
+
+
+def has_inputs(merchant_dir: str | Path) -> bool:
+    """True when both input files are present.
+
+    Deliberately indifferent to whether ground truth exists beside them: the inputs are what
+    a decision needs, and a real merchant would never come with an answer key.
+    """
+    merchant_dir = Path(merchant_dir)
+    return all((merchant_dir / name).exists() for name in INPUT_FILES)
+
+
+def available_merchants(root: str | Path = DEFAULT_ROOT) -> list[str]:
+    """Every merchant under `root` that can be underwritten, by directory name."""
+    root = Path(root)
+    if not root.exists():
+        return []
+    return sorted(d.name for d in root.iterdir() if d.is_dir() and has_inputs(d))
 
 
 def load_transactions(path: str | Path) -> list[dict]:

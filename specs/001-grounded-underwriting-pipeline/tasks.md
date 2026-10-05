@@ -175,23 +175,22 @@ figure for each of the five measures, each computed against recorded ground trut
 
 ## Phase 6: User Story 4 — Inspect a run in the interface (Priority: P4)
 
-> **DROPPED, deliberately.** Cut for time, which this specification anticipated: US4 is named the
-> first candidate to cut, and its absence is stated to cost polish rather than the central claim.
-> FR-029 and FR-030 are satisfied instead by `ledgermind/decide.py`, which displays the memo, the
-> structured offer and the provenance of every figure in it, and computes nothing. What is unmet
-> is the interaction — analyses streaming as they run, and selecting a figure to see its source.
-> The observer hook in the agent loop exists for exactly that, so the remaining work is a UI layer
-> over an interface that is already in place.
+> **Dropped, then built.** Cut for time at the Phase 8 convergence, then reinstated once the
+> rest was done. Recorded both ways because the reasoning still holds: US4 was the right thing to
+> cut, its absence cost polish rather than the central claim, and `decide.py` covered FR-029 and
+> FR-030 in the meantime. What it adds is the interaction the CLI cannot — analyses appearing as
+> they run, and every figure in the memo shown beside the analysis that produced it and the
+> full-precision value behind what was written.
 
 **Goal**: Grounding becomes visible rather than merely claimed.
 
 **Independent test**: Run one merchant through the interface and confirm the analyst can see which
 analyses ran, what each returned, and which analysis produced any given figure in the memo.
 
-- [ ] T035 [US4] Implement `ledgermind/app/streamlit_app.py` with a merchant picker, a run trigger, and display of the memo and structured offer. Presentation only: the app must not compute, derive, or re-round any financial value (FR-030). This is the one module where `pandas` is permitted
-- [ ] T036 [US4] Stream tool calls into the interface as they happen — each analysis shown when it runs, with what it returned
-- [ ] T037 [US4] Add per-figure provenance display — selecting any figure in the memo names the analysis that produced it, listing all matching facts where resolution was ambiguous (FR-029)
-- [ ] T038 [US4] Surface the fallback notice in the interface whenever `used_fallback` is set, and render the eval report (SC-007)
+- [x] T035 [US4] Implement `ledgermind/app/streamlit_app.py` with a merchant picker, a run trigger, and display of the memo and structured offer. Presentation only: the app must not compute, derive, or re-round any financial value (FR-030). This is the one module where `pandas` is permitted
+- [x] T036 [US4] Stream tool calls into the interface as they happen — each analysis shown when it runs, with what it returned
+- [x] T037 [US4] Add per-figure provenance display — selecting any figure in the memo names the analysis that produced it, listing all matching facts where resolution was ambiguous (FR-029)
+- [x] T038 [US4] Surface the fallback notice in the interface whenever `used_fallback` is set, and render the eval report (SC-007)
 
 **Checkpoint**: the full demo path works end to end.
 
